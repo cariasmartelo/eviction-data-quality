@@ -1,17 +1,18 @@
-##Machine Learning for Public Policy.
-##Angelica Valdiviezo
-##Chi Nguyen
-##Camilo Arias
-##Code to download data from eviction lab.
-import boto3
+'''
+Machine Learning for Public Policy.
+Angelica Valdiviezo
+Chi Nguyen
+Camilo Arias
+Code to download data from eviction lab.
+'''
 import os
+import boto3
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties
 import mapclassify
 import geopandas as gpd
-from shapely.geometry import Point, Polygon, MultiPoint, shape
+#from shapely.geometry import Point, Polygon, MultiPoint, shape
 
 
 def download_from_api(state, geo_level='all', filepath=None, download_dict=False):
@@ -31,7 +32,7 @@ def download_from_api(state, geo_level='all', filepath=None, download_dict=False
     if not os.path.exists(filepath + state + r'/'):
         os.mkdir(filepath + state + r'/')
     files = [geo_level + '.csv']
-    if not geo_level == 'all':
+    if geo_level != 'all':
         files.append(geo_level + '.geojson')
     s3 = boto3.client('s3')
     for file in files:
@@ -42,7 +43,7 @@ def download_from_api(state, geo_level='all', filepath=None, download_dict=False
         s3.download_file('eviction-lab-data-downloads', 'DATA_DICTIONARY.txt',
                          filepath + 'DATA_DICTIONARY.txt')
         print("Downloaded {} in {}".format('DATA_DICTIONARY.txt', filepath))
-    
+
 
 def import_csv(csv_file):
     '''
@@ -64,7 +65,7 @@ def import_csv(csv_file):
         'evictions': float, 'eviction-rate': float, 'eviction-filing-rate': float,
         'low-flag': float, 'imputed': float, 'subbed': float}
 
-    eviction_df = pd.read_csv(csv_file, dtype = eviction_lab_dtypes)
+    eviction_df = pd.read_csv(csv_file, dtype=eviction_lab_dtypes)
 
     return eviction_df
 
@@ -89,7 +90,7 @@ def describe(eviction_df, var_type=None):
         var_type: 'demographics', 'real-estate' or 'evictions' (string)
     '''
     var_classification = {
-        'demographics': ['population', 'poverty-rate','median-household-income',
+        'demographics': ['population', 'poverty-rate', 'median-household-income',
                          'pct-white', 'pct-af-am', 'pct-hispanic', 'pct-am-ind',
                          'pct-asian', 'pct-nh-pi', 'pct-multiple', 'pct-other'],
         'real-estate': ['renter-occupied-households', 'pct-renter-occupied',
@@ -102,7 +103,7 @@ def describe(eviction_df, var_type=None):
     else:
         print(eviction_df[var_classification[var_type]].describe())
 
-def map(eviction_gdf, variable, year, geography_name):
+def plot_map(eviction_gdf, variable, year, geography_name):
     '''
     Map by zip code the value of the column indicated in colorcol and the year.
     Inputs:
@@ -127,20 +128,16 @@ def map(eviction_gdf, variable, year, geography_name):
     colorcol = {v: i for i, v in col_dict.items()}[variable]
     colorcol += '-' + str(year)[-2:] #Use variable and year to get column name
 
-    fig, ax = plt.subplots(figsize  = (8, 12))
-    eviction_gdf.plot(color="grey", ax = ax, edgecolor = "black")
+    fig, ax = plt.subplots(figsize=(8, 12))
+    eviction_gdf.plot(color="grey", ax=ax, edgecolor="black")
     eviction_gdf[eviction_gdf[colorcol].notna()].plot(ax=ax, column=colorcol,
                                                       cmap='viridis',
                                                       scheme='quantiles',
                                                       legend=True)
 
     ax.set_title('Tracts of {} by {} in {}\n(Tracts without data'
-                 ' in grey)'.format(geography_name," ".join(variable.split("-"))
-                                    ,year))
-    #plt.legend(loc='best')
-    # fontP = FontProperties()
-    # fontP.set_size('small')
-    # ax.legend(ax, "title", prop=fontP)
+                 ' in grey)'.format(geography_name, " ".join(variable.split("-")),
+                                    year))
     plt.show()
 
 
@@ -172,12 +169,10 @@ def see_scatterplot(eviction_df, xcol, ycol, colorcol=None, logx=False,
     plt.clf()
     if not colorcol:
         df_to_plot.plot.scatter(x=xcol, y=ycol, legend=True, logx=logx,
-                               logy=logy)
+                                logy=logy)
     else:
         df_to_plot.plot.scatter(x=xcol, y=ycol, c=colorcol, cmap='viridis',
-                               legend=True, logx=logx, logy=logy)
+                                legend=True, logx=logx, logy=logy)
     plt.title('Scatterplot of eviction DataFrame \n {} and {}'
-                  .format(xcol, ycol))
+              .format(xcol, ycol))
     plt.show()
-
-

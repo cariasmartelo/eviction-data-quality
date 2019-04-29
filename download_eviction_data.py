@@ -8,6 +8,8 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
+import mapclassify
 import geopandas as gpd
 from shapely.geometry import Point, Polygon, MultiPoint, shape
 
@@ -100,13 +102,14 @@ def describe(eviction_df, var_type=None):
     else:
         print(eviction_df[var_classification[var_type]].describe())
 
-def map(eviction_gdf, variable, year):
+def map(eviction_gdf, variable, year, geography_name):
     '''
     Map by zip code the value of the column indicated in colorcol and the year.
     Inputs:
         eviction_gdf: GeoDataFrame
         variable: Str
         year: int
+        geography_name: str
     Output:
         Map
     '''
@@ -124,12 +127,20 @@ def map(eviction_gdf, variable, year):
     colorcol = {v: i for i, v in col_dict.items()}[variable]
     colorcol += '-' + str(year)[-2:] #Use variable and year to get column name
 
-    ax = eviction_gdf.plot(color="grey")
-    eviction_gdf.dropna().plot(ax=ax, column=colorcol, cmap='viridis',
-                             legend=True)
+    fig, ax = plt.subplots(figsize  = (8, 12))
+    eviction_gdf.plot(color="grey", ax = ax, edgecolor = "black")
+    eviction_gdf[eviction_gdf[colorcol].notna()].plot(ax=ax, column=colorcol,
+                                                      cmap='viridis',
+                                                      scheme='quantiles',
+                                                      legend=True)
 
-    ax.set_title('Tracts of Illinois by {} in {}\n(Tracts without data'
-                 ' in grey)'.format(" ".join(variable.split("-")), year))
+    ax.set_title('Tracts of {} by {} in {}\n(Tracts without data'
+                 ' in grey)'.format(geography_name," ".join(variable.split("-"))
+                                    ,year))
+    #plt.legend(loc='best')
+    # fontP = FontProperties()
+    # fontP.set_size('small')
+    # ax.legend(ax, "title", prop=fontP)
     plt.show()
 
 

@@ -37,122 +37,89 @@ CRIME_CLASS = {
                               '14', '15', '16', '17', '18', '19', '20', '22',\
                               '24', '26']}
 
-# ACS_TABLES_KEYS = {
-#                 2015: {
-#                     'total':
-#                     {'B15003_001E': 'pop_over_25'},
-#                     'up_to_middle':
-#                         {'B15003_002E': 'no_schooling_completed',
-#                          'B15003_003E': 'nursery_school_completed',
-#                          'B15003_004E': 'kiderdarten_completed',
-#                          'B15003_005E': 'first_grade',
-#                          'B15003_006E': 'second_grade',
-#                          'B15003_007E': 'third_grade',
-#                          'B15003_008E': 'fourth_grade',
-#                          'B15003_009E': 'fifth_grade',
-#                          'B15003_010E': 'sixth_grade',
-#                          'B15003_011E': 'seventh_grade',
-#                          'B15003_012E': 'eigth_grade'},
-#                     'not_highschool_grad':
-#                         {'B15003_013E': 'ninth_grade',
-#                          'B15003_014E': 'tenth_grade',
-#                          'B15003_015E': 'eleventh_grade',
-#                          'B15003_016E': 'twelfth_grade'},
-#                     'high_school_grad':
-#                         {'B15003_017E': 'highschool_completed',
-#                          'B15003_018E': 'GED_credential'},
-#                     'some_college':
-#                         {'B15003_019E': 'college_less_one_year',
-#                          'B15003_020E': 'college_more_one_year'},
-#                     'associate':
-#                         {'B15003_021E': 'associate_degree'},
-#                     'bachelor':
-#                         {'B15003_022E': 'bachelors_degree'},
-#                     'graduate':
-#                         {'B15003_023E': 'masters_degree',
-#                          'B15003_024E': 'professional_School_degree',
-#                          'B15003_025E': 'doctorate_degree'}},
-#                 2010: {
-#                     'total':
-#                     {'B15002_001E': 'pop_over_25'},
-#                     'total_by_gdr':
-#                     {'B15002_002E': 'male_over_25',
-#                     }
-#                     'up_to_middle':
-#                         {'B15002_003E': 'm_no_schooling_completed',
-#                          'B15002_004E': 'm_nursery_school_completed',
-#                          'B15002_005E': 'm_kiderdarten_completed',
-#                          'B15002_006E': 'm_first_grade',
-#                          'B15002_007E': 'm_second_grade',
-#                          'B15002_008E': 'm_third_grade',
-#                          'B15002_009E': 'm_fourth_grade',
-#                          'B15002_010E': 'm_fifth_grade',
-#                          'B15002_011E': 'm_sixth_grade',
-#                          'B15002_012E': 'm_seventh_grade',
-#                          'B15002_013E': 'm_eigth_grade',
-#                          },
-#                         'not_highschool_grad':
-#                             {'B15002_014E': 'm_ninth_grade',
-#                              'B15002_015E': 'm_tenth_grade',
-#                              'B15002_016E': 'eleventh_grade',
-#                              'B15002_017E': 'twelfth_grade'},
-#                         'high_school_grad':
-#                             {'B15002_018E': 'highschool_completed',
-#                              'B15002_019E': 'GED_credential'},
-#                         'some_college':
-#                             {'B15002_020E': 'college_less_one_year',
-#                              'B15002_021E': 'college_more_one_year'},
-#                         'associate':
-#                             {'B15002_022E': 'associate_degree'},
-#                         'bachelor':
-#                             {'B15002_023E': 'bachelors_degree'},
-#                         'graduate':
-#                             {'B15002_024E': 'masters_degree',
-#                              'B15002_025E': 'professional_School_degree',
-#                              'B15002_026E': 'doctorate_degree'}},
-#                     'female': {
-#                         'total':
-#                         {'B15002_002E': 'female_over_25'},
-#                         'up_to_middle':
-#                             {'B15002_003E': 'no_schooling_completed',
-#                              'B15002_004E': 'nursery_school_completed',
-#                              'B15002_005E': 'kiderdarten_completed',
-#                              'B15002_006E': 'first_grade',
-#                              'B15002_007E': 'second_grade',
-#                              'B15002_008E': 'third_grade',
-#                              'B15002_009E': 'fourth_grade',
-#                              'B15002_010E': 'fifth_grade',
-#                              'B15002_011E': 'sixth_grade',
-#                              'B15002_012E': 'seventh_grade',
-#                              'B15002_013E': 'eigth_grade'},
-#                         'not_highschool_grad':
-#                             {'B15002_014E': 'ninth_grade',
-#                              'B15002_015E': 'tenth_grade',
-#                              'B15002_016E': 'eleventh_grade',
-#                              'B15002_017E': 'twelfth_grade'},
-#                         'high_school_grad':
-#                             {'B15002_018E': 'highschool_completed',
-#                              'B15002_019E': 'GED_credential'},
-#                         'some_college':
-#                             {'B15002_020E': 'college_less_one_year',
-#                              'B15002_021E': 'college_more_one_year'},
-#                         'associate':
-#                             {'B15002_022E': 'associate_degree'},
-#                         'bachelor':
-#                             {'B15002_023E': 'bachelors_degree'},
-#                         'graduate':
-#                             {'B15002_024E': 'masters_degree',
-#                              'B15002_025E': 'professional_School_degree',
-#                              'B15002_026E': 'doctorate_degree'}}}
+ACS_TABLES_KEYS = {
+                2015: {
+                    'total':
+                    {'B15003_001E': 'pop_over_25'},
+                    'up_to_middle':
+                        {'B15003_002E': 'no_schooling_completed',
+                         'B15003_003E': 'nursery_school_completed',
+                         'B15003_004E': 'kiderdarten_completed',
+                         'B15003_005E': 'first_grade',
+                         'B15003_006E': 'second_grade',
+                         'B15003_007E': 'third_grade',
+                         'B15003_008E': 'fourth_grade',
+                         'B15003_009E': 'fifth_grade',
+                         'B15003_010E': 'sixth_grade',
+                         'B15003_011E': 'seventh_grade',
+                         'B15003_012E': 'eigth_grade'},
+                    'not_highschool_grad':
+                        {'B15003_013E': 'ninth_grade',
+                         'B15003_014E': 'tenth_grade',
+                         'B15003_015E': 'eleventh_grade',
+                         'B15003_016E': 'twelfth_grade'},
+                    'high_school_grad':
+                        {'B15003_017E': 'highschool_completed',
+                         'B15003_018E': 'GED_credential'},
+                    'some_college':
+                        {'B15003_019E': 'college_less_one_year',
+                         'B15003_020E': 'college_more_one_year'},
+                    'associate':
+                        {'B15003_021E': 'associate_degree'},
+                    'bachelor':
+                        {'B15003_022E': 'bachelors_degree'},
+                    'graduate':
+                        {'B15003_023E': 'masters_degree',
+                         'B15003_024E': 'professional_School_degree',
+                         'B15003_025E': 'doctorate_degree'}},
+                2009: {
+                    'total':
+                        {'B15002_001E': 'pop_over_25'},
+                    'total_by_gdr':
+                        {'B15002_002E': 'male_over_25',
+                         'B15002_019E': 'female_over_25'},  
+                    'up_to_middle':
+                        {'B15002_003E': 'm_no_schooling_completed',
+                         'B15002_004E': 'm_nursery_school_completed',
+                         'B15002_005E': 'm_5_and_6_grade',
+                         'B15002_006E': 'm_7_and_8_grade',
+                         'B15002_020E': 'f_no_schooling_completed',
+                         'B15002_021E': 'f_nursery_school_completed',
+                         'B15002_022E': 'f_5_and_6_grade',
+                         'B15002_023E': 'f_7_and_8_grade'},
+                    'not_highschool_grad':
+                        {'B15002_007E': 'm_ninth_grade',
+                         'B15002_008E': 'm_tenth_grade',
+                         'B15002_009E': 'm_eleventh_grade',
+                         'B15002_010E': 'm_twelfth_grade',
+                         'B15002_024E': 'f_ninth_grade',
+                         'B15002_025E': 'f_tenth_grade',
+                         'B15002_026E': 'f_eleventh_grade',
+                         'B15002_027E': 'f_twelfth_grade'},
+                    'high_school_grad':
+                        {'B15002_011E': 'm_highschool_GED_completed',
+                         'B15002_028E': 'f_highschool_GED_completed'},
+                    'some_college':
+                        {'B15002_012E': 'm_college_less_one_year',
+                         'B15002_013E': 'm_college_more_one_year',
+                         'B15002_029E': 'f_college_less_one_year',
+                         'B15002_030E': 'f_college_more_one_year'},
+                    'associate':
+                        {'B15002_014E': 'm_associate_degree',
+                         'B15002_031E': 'f_associate_degree'},
+                    'bachelor':
+                        {'B15002_015E': 'm_bachelors_degree',
+                         'B15002_032E': 'f_bachelors_degree'},
+                    'graduate':
+                        {'B15002_016E': 'm_masters_degree',
+                         'B15002_017E': 'm_professional_school_degree',
+                         'B15002_018E': 'm_doctorate_degree',
+                         'B15002_033E': 'f_masters_degree',
+                         'B15002_034E': 'f_professional_school_degree',
+                         'B15002_035E': 'f_doctorate_degree'}
+                    }
+                }
 
-
-# up_to_middle = 
-# not_highschool_grad = [10:]
-# high_school_grad =
-# some_college =  
-# associate = 
-# bachelor =
-# graduate = 
 ######### EVICTION LAB ############
 
 
@@ -332,7 +299,7 @@ def download_building_violation_data(year_from=2008, year_to=2016, limit=3000000
           .format(filepath))
 
 
-def download_census_data(acs_tables_dict):
+def download_census_data(acs_tables_dict=ACS_TABLES_KEYS, filepath=None):
     '''
     Download census data at the tract level of the table keys indicated.
     Inputs:
@@ -340,19 +307,24 @@ def download_census_data(acs_tables_dict):
     Output
 
     '''
-    keys = []
-    for level, key_pairs in acs_tables_dict.items():
-        keys += [k for k in key_pairs]
-    keys = tuple(keys)
-    
+    if not filepath:
+        filepath = os.path.join(os.getcwd(), 'acs', '')
+    if not os.path.exists(filepath):
+        os.mkdir(filepath)
+
+    joint_df = pd.DataFrame()    
     for year in [2009, 2015]:
+        keys = []
+        for level, key_pairs in acs_tables_dict[year].items():
+            keys += [k for k in key_pairs]
+        keys = tuple(keys)
         c = Census(CENSUS_KEY, year=year)
         acs_download = c.acs5.get(keys,
             {'for': 'tract:*', 'in': 'state:{} county:{}'.format('17', '031')})
 
         acs_df = pd.DataFrame(acs_download)
 
-        for level, key_pairs in acs_tables_dict.items():
+        for level, key_pairs in acs_tables_dict[year].items():
             acs_df.rename(columns = key_pairs, inplace = True)
             if level == 'total':
                 continue
@@ -360,9 +332,13 @@ def download_census_data(acs_tables_dict):
             acs_df[sublevels] = acs_df[sublevels].div(acs_df['pop_over_25'], axis=0)
             acs_df[level] = acs_df[sublevels].sum(axis=1)
         acs_df['year'] = year
+        joint_df = pd.concat([joint_df, acs_df])
+    cols_to_keep = [level for level in acs_tables_dict[2015] if level != 'total']
+    cols_to_keep += ['year', 'tract', 'county', 'pop_over_25']
+    joint_df[cols_to_keep].to_csv(os.path.join(filepath, 'education.csv'))
+    print("Downloaded Education Attainment of Chicago in {}"
+          .format(filepath))
 
-
-    return acs_df
 
 def load_tract_shapefile():
     '''
@@ -384,5 +360,6 @@ if __name__ == "__main__":
     download_eviction_data()
     download_crime_data()
     download_building_violation_data()
+    download_census_data()
 
 

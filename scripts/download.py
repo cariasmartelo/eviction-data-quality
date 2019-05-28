@@ -357,7 +357,7 @@ def load_tract_shapefile():
 
 
 if __name__ == "__main__":
-    download_eviction_data()
+    # download_eviction_data()
     download_crime_data()
     download_building_violation_data()
     download_census_data()

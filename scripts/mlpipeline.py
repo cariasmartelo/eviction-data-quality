@@ -29,6 +29,19 @@ from mlhelper import *
 RANDOM_STATE = 100
 
 
+def create_label(df, label_col, k):
+    '''
+    '''
+    n = k * len(df)
+    sorted_df = df.sort_values(by='label_col', ascending=False)
+    threshold = sorted_df.loc[n, 'label_col']
+    df['label'] = 0
+
+    if df[label_col] >= threshold:
+        df['label'] = 1
+    return df
+
+
 def find_nuls(df):
     '''
     This function finds all the null columns in the dataframe

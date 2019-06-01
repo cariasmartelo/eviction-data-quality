@@ -371,18 +371,19 @@ def load_education():
     '''
     load and clean
     '''
+    # ANGELICA TODO MODIFY YEAR (IT IS 2009) AND LOAD DATA
     pass
 
 def load_acs_data(filename='../inputs/census_data_tract.csv'):
     '''
     load and clean
     '''
+    # TODO ANGELICA
     acs_df = pd.read_csv(filename)
+
     return acs_df
 
-def join_bases():
-    '''
-    '''
+def load_evict():
     evict_filename = '../inputs/eviction_data_tract.csv'
     d_type = {'tract': str}
     parse_date = ['filing_year']
@@ -412,6 +413,14 @@ def join_bases():
     evict_df = pd.read_csv(evict_filename, usecols=to_use, dtype=d_type, parse_dates=parse_date)
 
     return evict_df
+
+
+def join_bases():
+    '''
+    '''
+    evict_df = load_evict()
+
+    return evict_df
     # join with acs, education crime, building violations
 
 #### helper
@@ -420,9 +429,9 @@ def impute_acs_data(df):
     '''
     impute acs data so we get one row per year
     '''
-    # create new empty df with same columns
     # new_df = pd.DataFrame(columns=df.columns)
     # for each tract in tracts:
+
     pass
 
 

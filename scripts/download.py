@@ -122,33 +122,33 @@ ACS_TABLES_KEYS = {
 
 ######### EVICTION LAB ############
 
-
-def download_eviction_data(state='IL', geo_level='all', filepath=None, download_dict=False):
-    '''
-    Download data using Amazon S3 API
-    Inputs:
-        U.S. state: State 2 letter code (str)
-        geo_level: 'all', cities', 'counties', 'states' or 'tracts' (str)
-        filepath: filepath: Path to store data (str). Default input folder.
-        download_dict: True to download data dictionary.
-    '''
-    if not filepath:
-        filepath = os.path.join(os.getcwd(), 'eviction', '')
-    if not os.path.exists(filepath):
-        os.mkdir(filepath)
-    files = [geo_level + '.csv']
-    if geo_level != 'all':
-        files.append(geo_level + '.geojson')
-    s3 = boto3.client('s3')
-    for file in files:
-        s3.download_file('eviction-lab-data-downloads', os.path.join(state, file),
-                         os.path.join(filepath, file))
-        print("Downloaded {} of {} in {}"
-              .format(file, state, filepath))
-    if download_dict:
-        s3.download_file('eviction-lab-data-downloads', 'DATA_DICTIONARY.txt',
-                         os.path.join(filepath, 'DATA_DICTIONARY.txt'))
-        print("Downloaded {} in {}".format('DATA_DICTIONARY.txt', filepath))
+# TODO maybe delete
+# def download_eviction_data(state='IL', geo_level='all', filepath=None, download_dict=False):
+#     '''
+#     Download data using Amazon S3 API
+#     Inputs:
+#         U.S. state: State 2 letter code (str)
+#         geo_level: 'all', cities', 'counties', 'states' or 'tracts' (str)
+#         filepath: filepath: Path to store data (str). Default input folder.
+#         download_dict: True to download data dictionary.
+#     '''
+#     if not filepath:
+#         filepath = os.path.join(os.getcwd(), 'eviction', '')
+#     if not os.path.exists(filepath):
+#         os.mkdir(filepath)
+#     files = [geo_level + '.csv']
+#     if geo_level != 'all':
+#         files.append(geo_level + '.geojson')
+#     s3 = boto3.client('s3')
+#     for file in files:
+#         s3.download_file('eviction-lab-data-downloads', os.path.join(state, file),
+#                          os.path.join(filepath, file))
+#         print("Downloaded {} of {} in {}"
+#               .format(file, state, filepath))
+#     if download_dict:
+#         s3.download_file('eviction-lab-data-downloads', 'DATA_DICTIONARY.txt',
+#                          os.path.join(filepath, 'DATA_DICTIONARY.txt'))
+#         print("Downloaded {} in {}".format('DATA_DICTIONARY.txt', filepath))
 
 
 ######### CHI OP DATA ############
@@ -211,7 +211,6 @@ def do_transformations(df, to_numeric, to_datetime, to_integer):
         df[col] = pd.to_datetime(df[col])
 
     return df
-
 
 
 def download_crime_data(year_from=2008, year_to=2016, limit=3000000, filepath=None):
@@ -354,6 +353,65 @@ def load_tract_shapefile():
                                       'tractce10' : 'tract'},
                                       inplace = True)
     return tract_area_df
+
+######## MERGE THE DATABASES #########
+def load_building_violations():
+    '''
+    load and clean
+    '''
+    pass
+
+def load_crime_data():
+    '''
+    load and clean
+    '''
+    pass
+
+def load_education():
+    '''
+    load and clean
+    '''
+    pass
+
+def load_acs_data():
+    '''
+    load and clean
+    '''
+    pass
+
+def join_bases():
+    '''
+    '''
+    EVICT_FILENAME = #TODO
+    D_TYPES = {'tract': str}
+    PARSE_DATES = ['filing_year']
+    TO_USE = ['filing_year', 'tract', 'eviction_filings_total',
+           'eviction_filings_rate', 'eviction_filings_completed',
+           'case_type_single_action', 'case_type_joint_action', 'back_rent_median',
+           'back_rent_0', 'back_rent_1_to_999', 'back_rent_1000_to_2499',
+           'back_rent_2500_to_4999', 'back_rent_5000_or_more',
+           'landlord_represented', 'tenant_represented',
+           'tenant_rep_pa', 'tenant_rep_laa', 'eviction_order_yes',
+           'eviction_order_no', 'eviction_order_yes_tenant_prose',
+           'eviction_order_no_tenant_prose',
+           'eviction_order_yes_tenant_represented',
+           'eviction_order_no_tenant_represented',
+           'eviction_order_yes_tenant_rep_pa', 'eviction_order_no_tenant_rep_pa',
+           'eviction_order_yes_tenant_rep_laa', 'eviction_order_no_tenant_rep_laa',
+           'ftu_eviction_order', 'ftu_other_outcome', 'ftu_no_outcome',
+           'ftu_eviction_order_tenant_prose', 'ftu_other_outcome_tenant_prose',
+           'ftu_no_outcome_tenant_prose', 'ftu_eviction_order_tenant_represented',
+           'ftu_other_outcome_tenant_represented',
+           'ftu_no_outcome_tenant_represented', 'default_eviction_order_yes',
+           'default_eviction_order_no', 'default_eviction_order_yes_tenant_prose',
+           'default_eviction_order_no_tenant_prose',
+           'default_eviction_order_yes_tenant_represented',
+           'default_eviction_order_no_tenant_represented']
+
+    evict_df = pd.read_csv(filename, use_cols=TO_USE, dtype=D_TYPES, parse_dates=PARSE_DATES)
+
+    # join with acs, education crime, building violations
+
 
 
 if __name__ == "__main__":

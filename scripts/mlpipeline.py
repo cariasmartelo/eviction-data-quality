@@ -29,14 +29,24 @@ from mlhelper import *
 RANDOM_STATE = 100
 
 
-def create_label(df, label_col, k):
+def get_threshold(df, label_col, k):
     '''
+    This function finds the cut-off value for top k%
+    most at risk census tracts (highest eviction rate)
     '''
     n = k * len(df)
     sorted_df = df.sort_values(by='label_col', ascending=False)
     threshold = sorted_df.loc[n, 'label_col']
-    df['label'] = 0
+    return threshold
 
+
+def create_label(df, label_col, threshold):
+    '''
+    This function applies a label of 1 to census tracts having
+    eviction rate higher than threshold, and 0 to the rest
+    of the census tracts.
+    '''
+    df['label'] = 0
     if df[label_col] >= threshold:
         df['label'] = 1
     return df
@@ -63,20 +73,20 @@ def fill_null_cols(df, null_col_list):
             continue
 
 
-def discretize_cols(df, old_col, num_bins=3, labels=False):
+def discretize_cols(df, old_col, num_bins=3, cats=False):
     '''
     This function converts a list of continous columns into categorical
     Inputs:
         - dataframe (pandas dataframe)
-        - feature (string): label of column to discretize
+        - old col (string): label of column to discretize
         - num_bins (int): number of bins to discretize into
-        - labels
+        - cats: a list of categories to organize the continuous values into
     Returns a pandas dataframe
     '''
     new_col = old_col + '_group'
     df[new_col] = pd.cut(df[old_col], 
                          bins=num_bins, 
-                         labels=labels, 
+                         labels=cats, 
                          right=True, 
                          include_lowest=True)
     return df
@@ -101,19 +111,20 @@ def convert_to_datetime(df, cols_to_transform):
         df[col] = pd.to_datetime(df[col])
 
 
-def process_df(df, cols_to_discretize, num_bins, labels, cols_to_binary):
+def process_df(df, cols_to_discretize, num_bins, cats, cols_to_binary):
     '''
     This function puts together all the processing steps necessary for
     a dataframe
     '''
     fill_null_cols(df, find_nuls(df))
     for col in cols_to_discretize:
-        processed_df = discretize_cols(df, col, num_bins, labels)
+        processed_df = discretize_cols(df, col, num_bins, cats)
     processed_df = convert_to_binary(processed_df, cols_to_binary)
     return processed_df
 
 
-def process_train_data(rv, cols_to_discretize, num_bins, labels, cols_to_binary):
+def process_train_data(rv, cols_to_discretize, num_bins, 
+                       cats, cols_to_binary, label_col, k, option):
     '''
     This function will consider the train and test set separately 
     and perform processing functions on each set
@@ -122,10 +133,23 @@ def process_train_data(rv, cols_to_discretize, num_bins, labels, cols_to_binary)
     for split_date, data in rv.items():
         train = data[0]
         test = data[1]
+        #process train & test set (fill in nulls, discretize, convert to binary)
         processed_train = process_df(train, cols_to_discretize, 
-                                     num_bins, labels, cols_to_binary)
+                                     num_bins, cats, cols_to_binary)
         processed_test = process_df(test, cols_to_discretize, 
-                                    num_bins, labels, cols_to_binary)
+                                    num_bins, cats, cols_to_binary)
+        # create labels for train & test sets
+        #option 1 - use train and test's separate thresholds to create labels 
+        if option == 1:
+            train_threshold = get_threshold(processed_train, label_col, k)
+            processed_train = create_label(processed_train, label_col, train_threshold)
+            test_threshold = get_threshold(processed_test, label_col, k)
+            processed_test = create_label(processed_test, label_col, test_threshold)
+        # option 2 - use train's threshold for both sets
+        if option == 2:
+            train_threshold = get_threshold(processed_train, label_col, k)
+            processed_train = create_label(processed_train, label_col, train_threshold)
+            processed_test = create_label(processed_test, label_col, train_threshold)
         processed_rv[split_date] = [processed_train, processed_test]
     return processed_rv
 

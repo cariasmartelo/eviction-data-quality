@@ -355,17 +355,35 @@ def load_tract_shapefile():
     return tract_area_df
 
 ######## MERGE THE DATABASES #########
-def load_building_violations():
+def load_building_violations(csv_file):
     '''
     load and clean
     '''
-    pass
+    build_viol = pd.read_csv(csv_file)
 
-def load_crime_data():
+    to_numeric = ['inspection_number', 'street_number', 'property_group',\
+                  'latitude', 'longitude']
+    to_integer = []
+
+    to_datetime = ['violation_date', 'violation_status_date',\
+                   'violation_last_modified_date']
+    build_viol = do_transformations(build_viol, to_numeric, to_datetime, to_integer)
+    return build_viol
+
+def load_crime_data(csv_file):
     '''
     load and clean
     '''
-    pass
+    crime_df = pd.read_csv(csv_file)
+    to_numeric = ['year', 'street_number', 'property_group',\
+                  'latitude', 'longitude']
+    to_integer = ['arrest', 'domestic']
+
+    to_datetime = ['violation_date', 'violation_status_date',\
+                   'violation_last_modified_date']
+    #crime_df = do_transformations(crime_df, to_numeric, to_datetime, to_integer)
+
+    return crime_df
 
 def load_education():
     '''
@@ -382,7 +400,7 @@ def load_acs_data():
 def join_bases():
     '''
     '''
-    EVICT_FILENAME = #TODO
+    # EVICT_FILENAME = #TODO
     D_TYPES = {'tract': str}
     PARSE_DATES = ['filing_year']
     TO_USE = ['filing_year', 'tract', 'eviction_filings_total',
@@ -417,7 +435,7 @@ def join_bases():
 if __name__ == "__main__":
     # download_eviction_data()
     download_crime_data()
-    download_building_violation_data()
-    download_census_data()
+    #download_building_violation_data()
+    #download_census_data()
 
 

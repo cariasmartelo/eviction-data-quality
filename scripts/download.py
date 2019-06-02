@@ -389,21 +389,29 @@ def load_education():
     '''
     load and clean
     '''
+    # ANGELICA TODO MODIFY YEAR (IT IS 2009) AND LOAD DATA
     pass
 
-def load_acs_data():
+def load_acs_data(filename='../inputs/census_data_tract.csv'):
     '''
     load and clean
     '''
-    pass
+    # TODO ANGELICA
+    acs_df = pd.read_csv(filename)
 
-def join_bases():
+def jo
+in_bases():
     '''
     '''
     # EVICT_FILENAME = #TODO
-    D_TYPES = {'tract': str}
-    PARSE_DATES = ['filing_year']
-    TO_USE = ['filing_year', 'tract', 'eviction_filings_total',
+
+    return load_evict()
+
+def load_evict():
+    evict_filename = '../inputs/eviction_data_tract.csv'
+    d_type = {'tract': str}
+    parse_date = ['filing_year']
+    to_use = ['filing_year', 'tract', 'eviction_filings_total',
            'eviction_filings_rate', 'eviction_filings_completed',
            'case_type_single_action', 'case_type_joint_action', 'back_rent_median',
            'back_rent_0', 'back_rent_1_to_999', 'back_rent_1000_to_2499',
@@ -426,10 +434,29 @@ def join_bases():
            'default_eviction_order_yes_tenant_represented',
            'default_eviction_order_no_tenant_represented']
 
-    evict_df = pd.read_csv(filename, use_cols=TO_USE, dtype=D_TYPES, parse_dates=PARSE_DATES)
+    evict_df = pd.read_csv(evict_filename, usecols=to_use, dtype=d_type, parse_dates=parse_date)
 
+    return evict_df
+
+
+def join_bases():
+    '''
+    '''
+    evict_df = load_evict()
+
+    return evict_df
     # join with acs, education crime, building violations
 
+#### helper
+
+def impute_acs_data(df):
+    '''
+    impute acs data so we get one row per year
+    '''
+    # new_df = pd.DataFrame(columns=df.columns)
+    # for each tract in tracts:
+
+    pass
 
 
 if __name__ == "__main__":

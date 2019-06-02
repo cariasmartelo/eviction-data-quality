@@ -18,27 +18,37 @@ from scipy import optimize
 import time
 import seaborn as sns
 import csv
+import math
 from sklearn.model_selection import ParameterGrid, train_test_split
 from sklearn.metrics import roc_auc_score 
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
-from mlhelper import *
+from helper import *
 
 
 RANDOM_STATE = 100
 
 
-def create_label(df, label_col, k):
+def get_threshold(df, label_col, k):
     '''
+    This function finds the cut-off value for top k%
+    most at risk census tracts (highest eviction rate)
     '''
-    n = k * len(df)
-    sorted_df = df.sort_values(by='label_col', ascending=False)
-    threshold = sorted_df.loc[n, 'label_col']
-    df['label'] = 0
+    n = math.floor(k * len(df))
+    sorted_df = df.sort_values(by=label_col, ascending=False)
+    threshold = sorted_df.loc[n, label_col]
+    return threshold
 
-    if df[label_col] >= threshold:
-        df['label'] = 1
+
+def create_label(df, label_col, new_label_col, threshold):
+    '''
+    This function applies a label of 1 to census tracts having
+    eviction rate higher than threshold, and 0 to the rest
+    of the census tracts.
+    '''
+    
+    df[new_label_col] = np.where(df[label_col] >= threshold, 1, 0)
     return df
 
 
@@ -63,20 +73,20 @@ def fill_null_cols(df, null_col_list):
             continue
 
 
-def discretize_cols(df, old_col, num_bins=3, labels=False):
+def discretize_cols(df, old_col, num_bins=3, cats=False):
     '''
     This function converts a list of continous columns into categorical
     Inputs:
         - dataframe (pandas dataframe)
-        - feature (string): label of column to discretize
+        - old col (string): label of column to discretize
         - num_bins (int): number of bins to discretize into
-        - labels
+        - cats: a list of categories to organize the continuous values into
     Returns a pandas dataframe
     '''
     new_col = old_col + '_group'
     df[new_col] = pd.cut(df[old_col], 
                          bins=num_bins, 
-                         labels=labels, 
+                         labels=cats, 
                          right=True, 
                          include_lowest=True)
     return df
@@ -101,19 +111,20 @@ def convert_to_datetime(df, cols_to_transform):
         df[col] = pd.to_datetime(df[col])
 
 
-def process_df(df, cols_to_discretize, num_bins, labels, cols_to_binary):
+def process_df(df, cols_to_discretize, num_bins, cats, cols_to_binary):
     '''
     This function puts together all the processing steps necessary for
     a dataframe
     '''
     fill_null_cols(df, find_nuls(df))
     for col in cols_to_discretize:
-        processed_df = discretize_cols(df, col, num_bins, labels)
+        processed_df = discretize_cols(df, col, num_bins, cats)
     processed_df = convert_to_binary(processed_df, cols_to_binary)
     return processed_df
 
 
-def process_train_data(rv, cols_to_discretize, num_bins, labels, cols_to_binary):
+def process_train_data(rv, cols_to_discretize, num_bins, 
+                       cats, cols_to_binary, label_col, new_label_col, k, option):
     '''
     This function will consider the train and test set separately 
     and perform processing functions on each set
@@ -122,10 +133,25 @@ def process_train_data(rv, cols_to_discretize, num_bins, labels, cols_to_binary)
     for split_date, data in rv.items():
         train = data[0]
         test = data[1]
+        #process train & test set (fill in nulls, discretize, convert to binary)
         processed_train = process_df(train, cols_to_discretize, 
-                                     num_bins, labels, cols_to_binary)
+                                     num_bins, cats, cols_to_binary)
         processed_test = process_df(test, cols_to_discretize, 
-                                    num_bins, labels, cols_to_binary)
+                                    num_bins, cats, cols_to_binary)
+        # create labels for train & test sets
+        processed_train.reset_index(inplace=True)
+        processed_test.reset_index(inplace=True)
+        # option 1 - use train and test's separate thresholds to create labels 
+        if option == 1:
+            train_threshold = get_threshold(processed_train, label_col, k)
+            processed_train = create_label(processed_train, label_col, new_label_col, train_threshold)
+            test_threshold = get_threshold(processed_test, label_col, k)
+            processed_test = create_label(processed_test, label_col, new_label_col, test_threshold)
+        # option 2 - use train's threshold for both sets
+        if option == 2:
+            train_threshold = get_threshold(processed_train, label_col, k)
+            processed_train = create_label(processed_train, label_col, new_label_col, train_threshold)
+            processed_test = create_label(processed_test, label_col, new_label_col, train_threshold)
         processed_rv[split_date] = [processed_train, processed_test]
     return processed_rv
 
@@ -223,7 +249,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
     return results_df
 
 
-def temporal_validation(df, date_col, prediction_windows, gap, start_time, end_time):
+def temporal_validation(df, date_col, prediction_window, start_time, end_time, len_train, gap=0):
     '''
     Create a dictionary that maps a key that is the validation date with a list
     of train set and test set that correspond to that validation date.
@@ -233,7 +259,7 @@ def temporal_validation(df, date_col, prediction_windows, gap, start_time, end_t
         - df: a dataframe
         - date_col: the date column
         - prediction_windows: a list that contains all prediction windows in months
-        - gap: the number of days between train end date and test start date 
+        - gap: the number of days between train end date and test start date (not using for now)
         - start_time: string, earliest datetime in the data
         - end_time: string, latest datetime in the data
     Outputs:
@@ -244,17 +270,16 @@ def temporal_validation(df, date_col, prediction_windows, gap, start_time, end_t
     end_time_date = datetime.strptime(end_time, '%Y-%m-%d')
     train_start_time = start_time_date
     rv = {}
-    for prediction_window in prediction_windows:
-        test_end_time = end_time_date
-        while test_end_time >= start_time_date + relativedelta(months=prediction_window):
-            test_start_time = test_end_time - relativedelta(months=prediction_window)
-            #leaving a gap between the train set and the test set
-            train_end_time = test_start_time - relativedelta(days=gap)
-            train_set = df[(df[date_col] >= train_start_time) &
+    while train_start_time <= end_time_date - relativedelta(months=len_train) - relativedelta(months=prediction_window):
+        train_end_time = train_start_time + relativedelta(months=len_train)    
+        test_start_time = train_end_time + relativedelta(months=prediction_window)
+        test_end_time = test_start_time + relativedelta(months=prediction_window)
+        train_set = df[(df[date_col] >= train_start_time) &
                            (df[date_col] <= train_end_time)]
-            test_set = df[(df[date_col] >= test_start_time) &
+        test_set = df[(df[date_col] >= test_start_time) &
                            (df[date_col] <= test_end_time)]
-            rv[test_start_time] = [train_set, test_set]
-            #once done, move test end time backward
-            test_end_time -= relativedelta(months=prediction_window)
+        rv[test_start_time] = [train_set, test_set]
+        #once done, move test end time backward
+        train_start_time += relativedelta(months=prediction_window)
     return rv
+

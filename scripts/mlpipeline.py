@@ -184,7 +184,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
         for metric in metrics:
             metric_cols.append(metric + str(thres)) #cycling through all metrics and create column labels
     COLS = ['model_type', 'clf', 'parameters', 'split_date'] + \
-           ['train_start', 'train_end', 'test_start', 'test_end'] +\
+           ['min_year_in_train', 'max_year_in_train', 'min_year_in_test', 'max_year_in_test'] +\
            ['baseline'] + \
            metric_cols + \
            ['auc-roc']
@@ -272,14 +272,14 @@ def temporal_validation(df, date_col, prediction_window, start_time, end_time, l
     rv = {}
     while train_start_time <= end_time_date - relativedelta(months=len_train) - relativedelta(months=prediction_window):
         train_end_time = train_start_time + relativedelta(months=len_train)    
-        test_start_time = train_end_time + relativedelta(months=prediction_window)
+        test_start_time = train_end_time 
         test_end_time = test_start_time + relativedelta(months=prediction_window)
         train_set = df[(df[date_col] >= train_start_time) &
-                           (df[date_col] <= train_end_time)]
+                           (df[date_col] < train_end_time)]
         test_set = df[(df[date_col] >= test_start_time) &
-                           (df[date_col] <= test_end_time)]
+                           (df[date_col] < test_end_time)]
         rv[test_start_time] = [train_set, test_set]
         #once done, move test end time backward
-        train_start_time += relativedelta(months=prediction_window)
+        len_train += 12
     return rv
 

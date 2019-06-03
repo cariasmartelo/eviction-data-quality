@@ -16,6 +16,7 @@ import geopandas as gpd
 from sodapy import Socrata
 from census import Census
 from us import states
+from ast import literal_eval
 from shapely.geometry import Point, Polygon, MultiPoint, shape
 
 
@@ -213,7 +214,7 @@ def do_transformations(df, to_numeric, to_datetime, to_integer):
     return df
 
 
-def download_crime_data(year_from=2008, year_to=2016, limit=3000000, filepath=None):
+def download_crime_data(year_from=2010, year_to=2017, limit=3000000, filepath=None):
     '''
     Load Chicago crime data from City of Chicago Open Data portal
     using Socrata API from year_from to year_to
@@ -230,18 +231,16 @@ def download_crime_data(year_from=2008, year_to=2016, limit=3000000, filepath=No
     if not os.path.exists(filepath):
         os.mkdir(filepath)
 
-    crime_df = download_chiopdat_data(API_ENDPOINTS['CRIME_ENDPOINT'], year_from, year_to,
-                                  limit=limit)
+    crime_df = download_chiopdat_data(API_ENDPOINTS['CRIME_ENDPOINT'],
+                                      year_from, year_to, limit=limit)
 
     #Seting up types
 
-    to_numeric = ['year', 'inspection_number', 'street_number', 'property_group',\
-                  'latitude', 'longitude']
+    to_numeric = ['id', 'year', 'latitude', 'longitude']
     to_integer = ['arrest', 'domestic']
-
-    to_datetime = ['violation_date', 'violation_status_date',\
-                   'violation_last_modified_date']
-    crime_df = do_transformations(crime_df, to_numeric, to_datetime, to_integer)
+    to_datetime = ['date']
+    crime_df = do_transformations(crime_df, to_numeric,
+                                  to_datetime, to_integer)
 
     #Adding clasification column
     crime_class_inv = {}
@@ -251,12 +250,12 @@ def download_crime_data(year_from=2008, year_to=2016, limit=3000000, filepath=No
     crime_df['crime_class'] = crime_df['fbi_code'].map(crime_class_inv)
 
     crime_df.to_csv(os.path.join(filepath, 'crime.csv'))
-    crime_df.sample(frac=0.05).to_csv(os.path.join(filepath, 'sample_crime.csv'))
-    print("Downloaded crime of Chicago in {}"
-          .format(filepath))
+    crime_df.sample(frac=0.05).to_csv(os.path.join(filepath,
+                                                   'sample_crime.csv'))
+    print("Downloaded crime of Chicago in {}".format(filepath))
 
 
-def download_building_violation_data(year_from=2008, year_to=2016, limit=3000000,
+def download_building_violation_data(year_from=2010, year_to=2017, limit=3000000,
                                      filepath=None):
     '''
     Load Building Violation data from City of Chicago Open Data portal
@@ -339,33 +338,240 @@ def download_census_data(acs_tables_dict=ACS_TABLES_KEYS, filepath=None):
           .format(filepath))
 
 
-def load_tract_shapefile():
+def download_tract_shapefile(filepath=None):
     '''
     Download shapefile data and create GeoPandasDataFrame.
     Output:
         DataFrame
     '''
+    if not filepath:
+        filepath = os.path.join(os.getcwd(), 'ch_opdat', '')
+    if not os.path.exists(filepath):
+        os.mkdir(filepath)
+    
     client = Socrata(CHICAGO_OPEN_DATA, None)
-    tract_area = client.get(TRACT_ENDPOINT)
-
+    tract_area = client.get(API_ENDPOINTS['TRACT_ENDPOINT'])
     tract_area_df = pd.DataFrame.from_dict(tract_area)
     tract_area_df.rename(columns={'the_geom' : 'location',
-                                      'tractce10' : 'tract'},
-                                      inplace = True)
-    return tract_area_df
+                                  'tractce10' : 'tract'},
+                                  inplace = True)
+    tract_area_df.to_csv(os.path.join(filepath, 'tracts.csv'))
+    print("Downloaded shape of Chicago tracts in {}"
+          .format(filepath))
 
 ######## MERGE THE DATABASES #########
-def load_building_violations():
-    '''
-    load and clean
-    '''
-    pass
 
-def load_crime_data():
+
+def load_tract_shapefile(csv_file):
     '''
     load and clean
     '''
-    pass
+    tracts_df = pd.read_csv(csv_file)
+    tracts_df = tracts_df[['location', 'tract']]
+    tracts_df['location'] = tracts_df['location'].map(lambda x :
+        literal_eval(x) if not isinstance(x, float) else x)
+    return tracts_df
+
+
+def load_building_violations_spread(csv_file):
+    '''
+    load and clean
+    '''
+    build_viol = pd.read_csv(csv_file)
+
+    to_numeric = ['inspection_number', 'street_number', 'property_group',\
+                  'latitude', 'longitude']
+    to_integer = []
+
+    to_datetime = ['violation_date', 'violation_status_date',\
+                   'violation_last_modified_date']
+    build_viol = do_transformations(build_viol, to_numeric, to_datetime, to_integer)
+    build_viol['location'] = build_viol['location'].map(lambda x :
+        literal_eval(x) if not isinstance(x, float) else x)
+
+    return build_viol
+
+def aggregate_building_data(bv_df, tracts_df, save=False, filepath=None):
+    '''
+    Produce the aggregation of Crime Data by tract and year
+    Inputs:
+        crime_df = Pandas DF of crime
+        tracts_df= Pandas DF of tracts
+    Output:
+        Pandas DF
+    '''
+    geo_bv = convert_to_geopandas(bv_df, 'location')
+    geo_tract = convert_to_geopandas(tracts_df, 'location')
+    tract_bv = join_with_tract(geo_tract, geo_bv)
+    bv_agg = aggregate(tract_bv, ['violation_status', 'inspection_category',\
+                                  'department_bureau'])
+    bv_agg.rename(columns={'total': 'total_bioldinv_violations'}, inplace = True)
+
+    if save:
+        bv_agg.to_csv(os.path.join(filepath, 'building_violation_by_tract.csv'))
+
+    return bv_agg
+
+
+def load_crime_data_spread(csv_file):
+    '''
+    load and clean
+    '''
+    crime_df = pd.read_csv(csv_file)
+    to_numeric = ['id', 'year', 'latitude', 'longitude']
+    to_integer = ['arrest', 'domestic']
+    to_datetime = ['date', 'updated_on']
+    crime_df = do_transformations(crime_df, to_numeric, to_datetime, to_integer)
+    crime_df['location'] = crime_df['location'].map(lambda x :
+        literal_eval(x) if not isinstance(x, float) else x)
+
+    return crime_df
+
+def aggregate_crime_data(crime_df, tracts_df, save=False, filepath=None):
+    '''
+    Produce the aggregation of Crime Data by tract and year
+    Inputs:
+        crime_df = Pandas DF of crime
+        tracts_df= Pandas DF of tracts
+    Output:
+        Pandas DF
+    '''
+    geo_crime = convert_to_geopandas(crime_df, 'location')
+    geo_tract = convert_to_geopandas(tracts_df, 'location')
+    tract_crime = join_with_tract(geo_tract, geo_crime)
+    crime_agg = aggregate(tract_crime, ['crime_class', 'primary_type',\
+                                        'domestic', 'arrest'])
+    crime_agg.rename(columns={'total': 'total_crime'}, inplace = True)
+
+    if save:
+        crime_agg.to_csv(os.path.join(filepath, 'crime_by_tract.csv'))
+
+    return crime_agg
+
+
+def aggregate(tract_df, columns_to_aggregate):
+    '''
+    Make aggregations of df by tract and year. Columns to aggregate
+    are the columns to produce counts by. If 'crime_class' in columns
+    to aggregate, the resulting df will will have total by crime class.
+    Inputs:
+        tract_df: Joined df with tract and data
+        columns_to_aggregate: [str]
+    Output:
+        Pandas DF
+    '''
+    df = tract_df.groupby(['tract', 'year']).size().reset_index()
+    df.rename(columns = {0:'total'}, inplace = True)
+    for col in columns_to_aggregate:
+        agg_by_col_df = (tract_df.groupby(['tract', 'year', col])
+                               .size().unstack().add_prefix('total_' + col + '_')
+                               .fillna(0).reset_index())
+        df = df.merge(agg_by_col_df, on=['tract', 'year'])    
+
+    return df
+
+
+def convert_to_geopandas(df, location_col):
+    '''
+    Converts the pandas dataframe to geopandas DataFrame
+    Inputs:
+        df: Pandas DataFrame
+        location_col = stri
+    Output:
+        Geopandas DataFrame
+    '''
+    def shape_(x):
+
+        '''
+        Convert JSON location attribute to shapely.
+        '''
+        if not x:
+            return x
+        if isinstance(x, float):
+            return np.NaN
+        if isinstance(x, dict):
+            if 'type' in x:
+                return shape(x)
+            else:
+                return Point(float(x['longitude']),float(x['latitude']))
+
+
+    df['geometry'] = df[location_col].map(shape_)
+    geo_df = gpd.GeoDataFrame(df, crs = 'epsg:4326',
+                              geometry = df['geometry'])
+
+    return geo_df
+
+
+def join_with_tract(geo_tract, geo_df):
+    '''
+    Spatial Join between geo_trac and geo_crime
+    Inputs:
+        geo_trac: Geopandas
+        geo_crime: Geopandas
+    Output:
+        Geopandas
+    '''
+    geo_df = geo_df[geo_df.geometry.notna()] 
+    geo_tract_df = gpd.sjoin(geo_tract, geo_df, how="inner",
+                                         op='intersects')
+
+    return geo_tract_df
+
+
+def load_acs_data(acs_filename):
+    '''
+    load and clean
+    '''
+    # TODO ANGELICA
+    acs_df = pd.read_csv(acs_filename)
+
+
+def impute_acs_data(df, save=False, filepath=None):
+   '''
+   impute acs data so we get one row per year
+   '''
+   new_df = pd.DataFrame(columns=df.columns)
+   empty_row = [“”] * len(df.columns)
+   years_dict = {“2006-2010 5-year estimates”: [2010, 2011, 2012],
+                 “2013-2017 5-year estimates”: [2013, 2014, 2015, 2016,
+                                                2017, 2018]}
+   i = 0
+   rows, _ = df.shape
+   for row in range(rows):
+   years = years_dict[df.iloc[row][“year”]]
+       for year in years:
+           # here it is doubling the columns to the dataframe, don’t understand why
+           new_df = new_df.append(pd.Series(empty_row), ignore_index=True)
+           new_df.iloc[i] = df.iloc[row]
+           new_df.iloc[i][“year”] = year
+           i += 1
+
+   # temporary fix to the columns that are being created
+   to_drop = [i for i in range(len(df.columns))]
+   new_df = new_df.drop(columns=to_drop)
+   
+    if save:
+        new_df.to_csv(os.path.join(filepath, 'acs_tract_year.csv'))
+
+   return new_df
+
+
+def load_crime(csv_crime_csv):
+    '''
+    '''
+    crime_df = pd.read_csv(csv_crime_csv)
+    crime_df['tract'] = crime_df['tract'].astype(str)
+    return crime_df
+
+
+def load_building(csv_building_merged):
+    '''
+    '''
+    building_viol = pd.read_csv(csv_building_merged)
+    building_viol['tract'] = building_viol['tract'].astype(str)
+    return building_viol
+
 
 def load_education():
     '''
@@ -374,14 +580,41 @@ def load_education():
     # ANGELICA TODO MODIFY YEAR (IT IS 2009) AND LOAD DATA
     pass
 
-def load_acs_data(filename='../inputs/census_data_tract.csv'):
+
+def load_acs_data(acs_filename):
     '''
     load and clean
     '''
     # TODO ANGELICA
-    acs_df = pd.read_csv(filename)
+    acs_df = pd.read_csv(acs_filename)
 
-    return acs_df
+
+def impute_acs_data(df):
+   '''
+   impute acs data so we get one row per year
+   '''
+   new_df = pd.DataFrame(columns=df.columns)
+   empty_row = [“”] * len(df.columns)
+   years_dict = {“2006-2010 5-year estimates”: [2010, 2011, 2012],
+                 “2013-2017 5-year estimates”: [2013, 2014, 2015, 2016,
+                                                2017, 2018]}
+   i = 0
+   rows, _ = df.shape
+   for row in range(rows):
+   years = years_dict[df.iloc[row][“year”]]
+       for year in years:
+           # here it is doubling the columns to the dataframe, don’t understand why
+           new_df = new_df.append(pd.Series(empty_row), ignore_index=True)
+           new_df.iloc[i] = df.iloc[row]
+           new_df.iloc[i][“year”] = year
+           i += 1
+
+   # temporary fix to the columns that are being created
+   to_drop = [i for i in range(len(df.columns))]
+   new_df = new_df.drop(columns=to_drop)
+
+   return new_df
+
 
 def load_evict():
     evict_filename = '../inputs/eviction_data_tract.csv'
@@ -411,34 +644,28 @@ def load_evict():
            'default_eviction_order_no_tenant_represented']
 
     evict_df = pd.read_csv(evict_filename, usecols=to_use, dtype=d_type, parse_dates=parse_date)
+    eviction_df['year'] = eviction_df['filing_year'].map(lambda x: x.year)
 
     return evict_df
 
 
-def join_bases():
+def join_bases(eviction_df, acs_df, crime_df, building_viol_df):
     '''
+    Join dfs
     '''
-    evict_df = load_evict()
+    acs_df = acs_df.impute_acs_data(acs_df)
+    return_df = pd.merge(eviction_df, acs_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, crime_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, acs_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, acs_df)
 
-    return evict_df
-    # join with acs, education crime, building violations
-
-#### helper
-
-def impute_acs_data(df):
-    '''
-    impute acs data so we get one row per year
-    '''
-    # new_df = pd.DataFrame(columns=df.columns)
-    # for each tract in tracts:
-
-    pass
+    return return_df
+    
 
 
 if __name__ == "__main__":
-    # download_eviction_data()
-    download_crime_data()
-    download_building_violation_data()
-    download_census_data()
-
-
+    #download_eviction_data()
+    #download_crime_data()
+    #download_building_violation_data()
+    #download_census_data()
+    pass

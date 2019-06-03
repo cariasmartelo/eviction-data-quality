@@ -373,7 +373,7 @@ def load_tract_shapefile(csv_file):
     return tracts_df
 
 
-def load_building_violations(csv_file):
+def load_building_violations_spread(csv_file):
     '''
     load and clean
     '''
@@ -413,7 +413,7 @@ def aggregate_building_data(bv_df, tracts_df, save=False, filepath=None):
     return bv_agg
 
 
-def load_crime_data(csv_file):
+def load_crime_data_spread(csv_file):
     '''
     load and clean
     '''
@@ -518,6 +518,61 @@ def join_with_tract(geo_tract, geo_df):
 
     return geo_tract_df
 
+
+def load_acs_data(acs_filename):
+    '''
+    load and clean
+    '''
+    # TODO ANGELICA
+    acs_df = pd.read_csv(acs_filename)
+
+
+def impute_acs_data(df, save=False, filepath=None):
+   '''
+   impute acs data so we get one row per year
+   '''
+   new_df = pd.DataFrame(columns=df.columns)
+   empty_row = [“”] * len(df.columns)
+   years_dict = {“2006-2010 5-year estimates”: [2010, 2011, 2012],
+                 “2013-2017 5-year estimates”: [2013, 2014, 2015, 2016,
+                                                2017, 2018]}
+   i = 0
+   rows, _ = df.shape
+   for row in range(rows):
+   years = years_dict[df.iloc[row][“year”]]
+       for year in years:
+           # here it is doubling the columns to the dataframe, don’t understand why
+           new_df = new_df.append(pd.Series(empty_row), ignore_index=True)
+           new_df.iloc[i] = df.iloc[row]
+           new_df.iloc[i][“year”] = year
+           i += 1
+
+   # temporary fix to the columns that are being created
+   to_drop = [i for i in range(len(df.columns))]
+   new_df = new_df.drop(columns=to_drop)
+   
+    if save:
+        new_df.to_csv(os.path.join(filepath, 'acs_tract_year.csv'))
+
+   return new_df
+
+
+def load_crime(csv_crime_csv):
+    '''
+    '''
+    crime_df = pd.read_csv(csv_crime_csv)
+    crime_df['tract'] = crime_df['tract'].astype(str)
+    return crime_df
+
+
+def load_building(csv_building_merged):
+    '''
+    '''
+    building_viol = pd.read_csv(csv_building_merged)
+    building_viol['tract'] = building_viol['tract'].astype(str)
+    return building_viol
+
+
 def load_education():
     '''
     load and clean
@@ -525,19 +580,41 @@ def load_education():
     # ANGELICA TODO MODIFY YEAR (IT IS 2009) AND LOAD DATA
     pass
 
-def load_acs_data(filename='../inputs/census_data_tract.csv'):
+
+def load_acs_data(acs_filename):
     '''
     load and clean
     '''
     # TODO ANGELICA
-    acs_df = pd.read_csv(filename)
+    acs_df = pd.read_csv(acs_filename)
 
-def join_bases():
-    '''
-    '''
-    # EVICT_FILENAME = #TODO
 
-    return load_evict()
+def impute_acs_data(df):
+   '''
+   impute acs data so we get one row per year
+   '''
+   new_df = pd.DataFrame(columns=df.columns)
+   empty_row = [“”] * len(df.columns)
+   years_dict = {“2006-2010 5-year estimates”: [2010, 2011, 2012],
+                 “2013-2017 5-year estimates”: [2013, 2014, 2015, 2016,
+                                                2017, 2018]}
+   i = 0
+   rows, _ = df.shape
+   for row in range(rows):
+   years = years_dict[df.iloc[row][“year”]]
+       for year in years:
+           # here it is doubling the columns to the dataframe, don’t understand why
+           new_df = new_df.append(pd.Series(empty_row), ignore_index=True)
+           new_df.iloc[i] = df.iloc[row]
+           new_df.iloc[i][“year”] = year
+           i += 1
+
+   # temporary fix to the columns that are being created
+   to_drop = [i for i in range(len(df.columns))]
+   new_df = new_df.drop(columns=to_drop)
+
+   return new_df
+
 
 def load_evict():
     evict_filename = '../inputs/eviction_data_tract.csv'
@@ -567,28 +644,23 @@ def load_evict():
            'default_eviction_order_no_tenant_represented']
 
     evict_df = pd.read_csv(evict_filename, usecols=to_use, dtype=d_type, parse_dates=parse_date)
+    eviction_df['year'] = eviction_df['filing_year'].map(lambda x: x.year)
 
     return evict_df
 
 
-def join_bases():
+def join_bases(eviction_df, acs_df, crime_df, building_viol_df):
     '''
+    Join dfs
     '''
-    evict_df = load_evict()
+    acs_df = acs_df.impute_acs_data(acs_df)
+    return_df = pd.merge(eviction_df, acs_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, crime_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, acs_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, acs_df)
 
-    return evict_df
-    # join with acs, education crime, building violations
-
-#### helper
-
-def impute_acs_data(df):
-    '''
-    impute acs data so we get one row per year
-    '''
-    # new_df = pd.DataFrame(columns=df.columns)
-    # for each tract in tracts:
-
-    pass
+    return return_df
+    
 
 
 if __name__ == "__main__":
@@ -596,6 +668,4 @@ if __name__ == "__main__":
     #download_crime_data()
     #download_building_violation_data()
     #download_census_data()
-    download_tract_shapefile()
-
-
+    pass

@@ -525,36 +525,37 @@ def load_acs_data(acs_filename):
     '''
     # TODO ANGELICA
     acs_df = pd.read_csv(acs_filename)
+    return acs_df
 
 
 def impute_acs_data(df, save=False, filepath=None):
-   '''
-   impute acs data so we get one row per year
-   '''
-   new_df = pd.DataFrame(columns=df.columns)
-   empty_row = [“”] * len(df.columns)
-   years_dict = {“2006-2010 5-year estimates”: [2010, 2011, 2012],
-                 “2013-2017 5-year estimates”: [2013, 2014, 2015, 2016,
+    '''
+    impute acs data so we get one row per year
+    '''
+    new_df = pd.DataFrame(columns=df.columns)
+    empty_row = [""] * len(df.columns)
+    years_dict = {"2006-2010 5-year estimates": [2010, 2011, 2012],
+                 "2013-2017 5-year estimates": [2013, 2014, 2015, 2016,
                                                 2017, 2018]}
-   i = 0
-   rows, _ = df.shape
-   for row in range(rows):
-   years = years_dict[df.iloc[row][“year”]]
-       for year in years:
+    i = 0
+    rows, _ = df.shape
+    for row in range(rows):
+        years = years_dict[df.iloc[row]["year"]]
+        for year in years:
            # here it is doubling the columns to the dataframe, don’t understand why
            new_df = new_df.append(pd.Series(empty_row), ignore_index=True)
            new_df.iloc[i] = df.iloc[row]
-           new_df.iloc[i][“year”] = year
+           new_df.iloc[i]["year"] = year
            i += 1
 
-   # temporary fix to the columns that are being created
-   to_drop = [i for i in range(len(df.columns))]
-   new_df = new_df.drop(columns=to_drop)
+    # temporary fix to the columns that are being created
+    to_drop = [i for i in range(len(df.columns))]
+    new_df = new_df.drop(columns=to_drop)
    
     if save:
         new_df.to_csv(os.path.join(filepath, 'acs_tract_year.csv'))
 
-   return new_df
+    return new_df
 
 
 def load_crime(csv_crime_csv):
@@ -562,6 +563,7 @@ def load_crime(csv_crime_csv):
     '''
     crime_df = pd.read_csv(csv_crime_csv)
     crime_df['tract'] = crime_df['tract'].astype(str)
+    crime_df['tract'] = crime_df['tract'].apply(lambda x: '{0:0>6}'.format(x))
     return crime_df
 
 
@@ -570,6 +572,7 @@ def load_building(csv_building_merged):
     '''
     building_viol = pd.read_csv(csv_building_merged)
     building_viol['tract'] = building_viol['tract'].astype(str)
+    building_viol['tract'] = building_viol['tract'].apply(lambda x: '{0:0>6}'.format(x)) 
     return building_viol
 
 
@@ -581,43 +584,21 @@ def load_education():
     pass
 
 
-def load_acs_data(acs_filename):
+def load_acs(acs_filename):
     '''
     load and clean
     '''
     # TODO ANGELICA
     acs_df = pd.read_csv(acs_filename)
+    acs_df['tract'] = acs_df['tract'].astype(str)
+    acs_df['tract'] = acs_df['tract'].map(lambda x: x[-6:])
+
+    return acs_df
 
 
-def impute_acs_data(df):
-   '''
-   impute acs data so we get one row per year
-   '''
-   new_df = pd.DataFrame(columns=df.columns)
-   empty_row = [“”] * len(df.columns)
-   years_dict = {“2006-2010 5-year estimates”: [2010, 2011, 2012],
-                 “2013-2017 5-year estimates”: [2013, 2014, 2015, 2016,
-                                                2017, 2018]}
-   i = 0
-   rows, _ = df.shape
-   for row in range(rows):
-   years = years_dict[df.iloc[row][“year”]]
-       for year in years:
-           # here it is doubling the columns to the dataframe, don’t understand why
-           new_df = new_df.append(pd.Series(empty_row), ignore_index=True)
-           new_df.iloc[i] = df.iloc[row]
-           new_df.iloc[i][“year”] = year
-           i += 1
 
-   # temporary fix to the columns that are being created
-   to_drop = [i for i in range(len(df.columns))]
-   new_df = new_df.drop(columns=to_drop)
-
-   return new_df
-
-
-def load_evict():
-    evict_filename = '../inputs/eviction_data_tract.csv'
+def load_evict(evict_csv):
+    evict_filename = evict_csv
     d_type = {'tract': str}
     parse_date = ['filing_year']
     to_use = ['filing_year', 'tract', 'eviction_filings_total',
@@ -644,8 +625,8 @@ def load_evict():
            'default_eviction_order_no_tenant_represented']
 
     evict_df = pd.read_csv(evict_filename, usecols=to_use, dtype=d_type, parse_dates=parse_date)
-    eviction_df['year'] = eviction_df['filing_year'].map(lambda x: x.year)
-
+    evict_df['year'] = evict_df['filing_year'].map(lambda x: x.year)
+    evict_df['tract'] = evict_df['tract'].map(lambda x: x[-6:])
     return evict_df
 
 
@@ -653,11 +634,10 @@ def join_bases(eviction_df, acs_df, crime_df, building_viol_df):
     '''
     Join dfs
     '''
-    acs_df = acs_df.impute_acs_data(acs_df)
     return_df = pd.merge(eviction_df, acs_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, crime_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, acs_df, on = ['tract', 'year'])
-    return_df = pd.merge(return_df, acs_df)
+    return_df = pd.merge(return_df, acs_df, on = ['tract', 'year'])
 
     return return_df
     

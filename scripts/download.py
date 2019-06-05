@@ -39,7 +39,7 @@ CRIME_CLASS = {
                               '24', '26']}
 
 ACS_TABLES_KEYS = {
-                2015: {
+                2017: {
                     'total':
                     {'B15003_001E': 'pop_over_25'},
                     'up_to_middle':
@@ -73,7 +73,7 @@ ACS_TABLES_KEYS = {
                         {'B15003_023E': 'masters_degree',
                          'B15003_024E': 'professional_School_degree',
                          'B15003_025E': 'doctorate_degree'}},
-                2009: {
+                2010: {
                     'total':
                         {'B15002_001E': 'pop_over_25'},
                     'total_by_gdr':
@@ -311,7 +311,7 @@ def download_census_data(acs_tables_dict=ACS_TABLES_KEYS, filepath=None):
         os.mkdir(filepath)
 
     joint_df = pd.DataFrame()    
-    for year in [2009, 2015]:
+    for year in [2010, 2017]:
         keys = []
         for level, key_pairs in acs_tables_dict[year].items():
             keys += [k for k in key_pairs]
@@ -331,7 +331,7 @@ def download_census_data(acs_tables_dict=ACS_TABLES_KEYS, filepath=None):
             acs_df[level] = acs_df[sublevels].sum(axis=1)
         acs_df['year'] = year
         joint_df = pd.concat([joint_df, acs_df])
-    cols_to_keep = [level for level in acs_tables_dict[2015] if level != 'total']
+    cols_to_keep = [level for level in acs_tables_dict[2017] if level != 'total']
     cols_to_keep += ['year', 'tract', 'county', 'pop_over_25']
     joint_df[cols_to_keep].to_csv(os.path.join(filepath, 'education.csv'))
     print("Downloaded Education Attainment of Chicago in {}"
@@ -405,7 +405,7 @@ def aggregate_building_data(bv_df, tracts_df, save=False, filepath=None):
     tract_bv = join_with_tract(geo_tract, geo_bv)
     bv_agg = aggregate(tract_bv, ['violation_status', 'inspection_category',\
                                   'department_bureau'])
-    bv_agg.rename(columns={'total': 'total_bioldinv_violations'}, inplace = True)
+    bv_agg.rename(columns={'total': 'total_building_violations'}, inplace = True)
 
     if save:
         bv_agg.to_csv(os.path.join(filepath, 'building_violation_by_tract.csv'))
@@ -528,15 +528,20 @@ def load_acs_data(acs_filename):
     return acs_df
 
 
-def impute_acs_data(df, save=False, filepath=None):
+def impute_acs_data(df, save=False, filepath=None, year_dict=None):
     '''
     impute acs data so we get one row per year
     '''
     new_df = pd.DataFrame(columns=df.columns)
     empty_row = [""] * len(df.columns)
-    years_dict = {"2006-2010 5-year estimates": [2010, 2011, 2012],
-                 "2013-2017 5-year estimates": [2013, 2014, 2015, 2016,
+    if not year_dict:
+      years_dict = {"2006-2010 5-year estimates": [2010, 2011, 2012],
+                    "2013-2017 5-year estimates": [2013, 2014, 2015, 2016,
                                                 2017, 2018]}
+
+    # educ_years_dict = {2010: [2010, 2011, 2012],
+    #                    2017: [2013, 2014, 2015, 2016, 2017, 2018]}
+
     i = 0
     rows, _ = df.shape
     for row in range(rows):
@@ -564,6 +569,12 @@ def load_crime(csv_crime_csv):
     crime_df = pd.read_csv(csv_crime_csv)
     crime_df['tract'] = crime_df['tract'].astype(str)
     crime_df['tract'] = crime_df['tract'].apply(lambda x: '{0:0>6}'.format(x))
+    subcrimes = crime_df.columns[4:]  
+    crimes_percentage = crime_df[subcrimes].div(crime_df['total_crime'], axis=0)
+    crimes_percentage = crimes_percentage.add_suffix('_perc')
+    crime_df = pd.concat([crime_df, crimes_percentage], axis=1)
+    crime_df.drop('Unnamed: 0', axis = 1, inplace=True)
+
     return crime_df
 
 
@@ -573,6 +584,12 @@ def load_building(csv_building_merged):
     building_viol = pd.read_csv(csv_building_merged)
     building_viol['tract'] = building_viol['tract'].astype(str)
     building_viol['tract'] = building_viol['tract'].apply(lambda x: '{0:0>6}'.format(x)) 
+    subviolations = building_viol.columns[4:]
+    building_viol.rename(columns={'total_bioldinv_violations':'total_building_violations'}, inplace=True)
+    bv_percentage = building_viol[subviolations].div(building_viol['total_building_violations'], axis=0)
+    bv_percentage = bv_percentage.add_suffix('_perc')
+    building_viol = pd.concat([building_viol, bv_percentage], axis=1)
+    building_viol.drop('Unnamed: 0', axis = 1, inplace=True)
     return building_viol
 
 
@@ -627,6 +644,7 @@ def load_evict(evict_csv):
     evict_df = pd.read_csv(evict_filename, usecols=to_use, dtype=d_type, parse_dates=parse_date)
     evict_df['year'] = evict_df['filing_year'].map(lambda x: x.year)
     evict_df['tract'] = evict_df['tract'].map(lambda x: x[-6:])
+    
     return evict_df
 
 
@@ -647,5 +665,5 @@ if __name__ == "__main__":
     #download_eviction_data()
     #download_crime_data()
     #download_building_violation_data()
-    #download_census_data()
+    download_census_data()
     pass

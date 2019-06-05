@@ -365,9 +365,10 @@ def download_tract_shapefile(filepath=None):
 def load_tract_shapefile(csv_file):
     '''
     load and clean
+    Used to make the spatial joins.
     '''
     tracts_df = pd.read_csv(csv_file)
-    tracts_df = tracts_df[['location', 'tract']]
+    tracts_df = tracts_df[['location', 'tract', 'commarea']]
     tracts_df['location'] = tracts_df['location'].map(lambda x :
         literal_eval(x) if not isinstance(x, float) else x)
     return tracts_df
@@ -376,6 +377,7 @@ def load_tract_shapefile(csv_file):
 def load_building_violations_spread(csv_file):
     '''
     load and clean
+    It has the building violations by lat and long.
     '''
     build_viol = pd.read_csv(csv_file)
 
@@ -399,6 +401,7 @@ def aggregate_building_data(bv_df, tracts_df, save=False, filepath=None):
         tracts_df= Pandas DF of tracts
     Output:
         Pandas DF
+        Saves to inputs.
     '''
     geo_bv = convert_to_geopandas(bv_df, 'location')
     geo_tract = convert_to_geopandas(tracts_df, 'location')
@@ -435,6 +438,7 @@ def aggregate_crime_data(crime_df, tracts_df, save=False, filepath=None):
         tracts_df= Pandas DF of tracts
     Output:
         Pandas DF
+        Saves to inputs.
     '''
     geo_crime = convert_to_geopandas(crime_df, 'location')
     geo_tract = convert_to_geopandas(tracts_df, 'location')
@@ -512,6 +516,7 @@ def join_with_tract(geo_tract, geo_df):
     Output:
         Geopandas
     '''
+    geo_tract = geo_tract[['location', 'tract']]
     geo_df = geo_df[geo_df.geometry.notna()] 
     geo_tract_df = gpd.sjoin(geo_tract, geo_df, how="inner",
                                          op='intersects')
@@ -522,25 +527,29 @@ def join_with_tract(geo_tract, geo_df):
 def load_acs_data(acs_filename):
     '''
     load and clean
+    Load of ACS data that only has 2010 and 2017.
     '''
     # TODO ANGELICA
     acs_df = pd.read_csv(acs_filename)
     return acs_df
 
 
-def impute_acs_data(df, save=False, filepath=None, year_dict=None):
+def impute_acs_data(df, acs=True, save=False, filepath=None, year_dict=None):
     '''
     impute acs data so we get one row per year
+    Used to create the education_year_tract and acs_year_tract files
     '''
+
     new_df = pd.DataFrame(columns=df.columns)
     empty_row = [""] * len(df.columns)
     if not year_dict:
-      years_dict = {"2006-2010 5-year estimates": [2010, 2011, 2012],
-                    "2013-2017 5-year estimates": [2013, 2014, 2015, 2016,
-                                                2017, 2018]}
-
-    # educ_years_dict = {2010: [2010, 2011, 2012],
-    #                    2017: [2013, 2014, 2015, 2016, 2017, 2018]}
+        if acs:
+            years_dict = {"2006-2010 5-year estimates": [2010, 2011, 2012, 2013,\
+                                                         2014, 2015, 2016, 2017],
+                          "2013-2017 5-year estimates": [2018]}
+        else:
+            years_dict = {2010: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017],
+                          2017: [2018]}
 
     i = 0
     rows, _ = df.shape
@@ -558,10 +567,16 @@ def impute_acs_data(df, save=False, filepath=None, year_dict=None):
     new_df = new_df.drop(columns=to_drop)
    
     if save:
-        new_df.to_csv(os.path.join(filepath, 'acs_tract_year.csv'))
+        if acs:
+            new_df.to_csv(os.path.join(filepath, 'acs_year_tract.csv'))
+        else:
+            new_df.to_csv(os.path.join(filepath, 'educ_year_year.csv'))
+
 
     return new_df
 
+
+########################## Final Load FUnctions
 
 def load_crime(csv_crime_csv):
     '''
@@ -569,10 +584,19 @@ def load_crime(csv_crime_csv):
     crime_df = pd.read_csv(csv_crime_csv)
     crime_df['tract'] = crime_df['tract'].astype(str)
     crime_df['tract'] = crime_df['tract'].apply(lambda x: '{0:0>6}'.format(x))
-    subcrimes = crime_df.columns[4:]  
+    subcrimes = crime_df.columns[4:7]  
     crimes_percentage = crime_df[subcrimes].div(crime_df['total_crime'], axis=0)
-    crimes_percentage = crimes_percentage.add_suffix('_perc')
+    crimes_percentage = crimes_percentage.add_prefix('perc_')
     crime_df = pd.concat([crime_df, crimes_percentage], axis=1)
+    to_increase = crime_df.columns[3:7]
+    crimes_increase = crime_df.sort_values(['tract', 'year'])\
+                        .set_index(['tract', 'year'])\
+                        [to_increase].pct_change()
+    crimes_increase = crimes_increase.add_prefix('perc_increase_')
+    crimes_increase = crimes_increase.reset_index()
+    crimes_increase.loc[crimes_increase.index[crimes_increase['year'] == 2010],2:]\
+        = np.NaN
+    crime_df = crime_df.merge(crimes_increase, on = ['tract', 'year'])
     crime_df.drop('Unnamed: 0', axis = 1, inplace=True)
 
     return crime_df
@@ -584,21 +608,21 @@ def load_building(csv_building_merged):
     building_viol = pd.read_csv(csv_building_merged)
     building_viol['tract'] = building_viol['tract'].astype(str)
     building_viol['tract'] = building_viol['tract'].apply(lambda x: '{0:0>6}'.format(x)) 
-    subviolations = building_viol.columns[4:]
+    subviolations = building_viol.columns[4:8]
     building_viol.rename(columns={'total_bioldinv_violations':'total_building_violations'}, inplace=True)
     bv_percentage = building_viol[subviolations].div(building_viol['total_building_violations'], axis=0)
     bv_percentage = bv_percentage.add_suffix('_perc')
     building_viol = pd.concat([building_viol, bv_percentage], axis=1)
+    to_increase = 'total_building_violations'
+    building_increase = building_viol.sort_values(['tract', 'year'])\
+                         .set_index(['tract', 'year'])\
+                         [to_increase].pct_change()
+    building_increase = building_increase.rename('perc_increase_bv')
+    building_increase = building_increase.reset_index()
+    building_increase.loc[building_increase['year'] == 2010, building_increase.columns[2:]] = np.NaN
+    building_viol = building_viol.merge(building_increase, on = ['tract', 'year'])
     building_viol.drop('Unnamed: 0', axis = 1, inplace=True)
     return building_viol
-
-
-def load_education():
-    '''
-    load and clean
-    '''
-    # ANGELICA TODO MODIFY YEAR (IT IS 2009) AND LOAD DATA
-    pass
 
 
 def load_acs(acs_filename):
@@ -609,10 +633,26 @@ def load_acs(acs_filename):
     acs_df = pd.read_csv(acs_filename)
     acs_df['tract'] = acs_df['tract'].astype(str)
     acs_df['tract'] = acs_df['tract'].map(lambda x: x[-6:])
-
+    housing_type = ['housing_units_rental', 'housing_units_other']
+    acs_df[housing_type]= acs_df[housing_type].apply\
+                         (lambda x: x/acs_df['housing_units_total'])
+    population_types = (['population_poverty_below', 'population_poverty_above',
+                         'population_race_white', 'population_race_black',
+                         'population_race_latinx', 'population_race_asian',
+                         'population_race_other'])
+    acs_df[population_types]= acs_df[population_types].apply\
+                              (lambda x: x/acs_df['population_total'])
     return acs_df
 
-
+def load_education(education_filename):
+    '''
+    load education
+    '''
+    education_df = pd.read_csv(education_filename)
+    education_df['tract'] = education_df['tract'].astype(int)
+    education_df['tract'] = education_df['tract'].apply(lambda x: '{0:0>6}'.format(x)) 
+    education_df['tract'] = education_df['tract'].astype(str)
+    return education_df
 
 def load_evict(evict_csv):
     evict_filename = evict_csv
@@ -644,19 +684,31 @@ def load_evict(evict_csv):
     evict_df = pd.read_csv(evict_filename, usecols=to_use, dtype=d_type, parse_dates=parse_date)
     evict_df['year'] = evict_df['filing_year'].map(lambda x: x.year)
     evict_df['tract'] = evict_df['tract'].map(lambda x: x[-6:])
+
     
     return evict_df
 
+def load_tract(tract_shp):
+    '''
+    load tract
+    '''
+    tract = load_tract_shapefile(tract_shp)
+    tract = tract[['tract', 'commarea']]
+    tract['tract'] = tract['tract'].apply(lambda x: '{0:0>6}'.format(x))
+    return tract
 
-def join_bases(eviction_df, acs_df, crime_df, building_viol_df):
+
+def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df, tract_df):
     '''
     Join dfs
     '''
     return_df = pd.merge(eviction_df, acs_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, education_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, crime_df, on = ['tract', 'year'])
-    return_df = pd.merge(return_df, acs_df, on = ['tract', 'year'])
-    return_df = pd.merge(return_df, acs_df, on = ['tract', 'year'])
-
+    return_df = pd.merge(return_df, building_viol_df, on = ['tract', 'year'])
+    return_df = pd.merge(return_df, tract_df, on = 'tract')
+    mean_by_commarea = return_df.groupby(['commarea', 'year']).mean().reset_index()  
+    return_df = pd.merge(return_df, mean_by_commarea, on = ['commarea', 'year'])
     return return_df
     
 

@@ -708,7 +708,8 @@ def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df, tr
     return_df = pd.merge(return_df, building_viol_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, tract_df, on = 'tract')
     mean_by_commarea = return_df.groupby(['commarea', 'year']).mean().reset_index()  
-    return_df = pd.merge(return_df, mean_by_commarea, on = ['commarea', 'year'])
+    return_df = pd.merge(return_df, mean_by_commarea, on = ['commarea', 'year'],
+    					 suffixes = ('', '_mean_by_commarea'))
     return return_df
     
 

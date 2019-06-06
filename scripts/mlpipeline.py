@@ -30,26 +30,33 @@ from helper import *
 RANDOM_STATE = 100
 
 
-def get_threshold(df, label_col, k):
+def get_threshold(num_array, quantile):
     '''
     This function finds the cut-off value for top k%
     most at risk census tracts (highest eviction rate)
+    To get the top 10% eviction rate, use quantile = .9
     '''
-    n = math.floor(k * len(df))
-    sorted_df = df.sort_values(by=label_col, ascending=False)
-    threshold = sorted_df.loc[n, label_col]
+    threshold = num_array.quantile(quantile)
     return threshold
 
 
-def create_label(df, label_col, new_label_col, threshold):
+def create_label(df, year_col, label_col, quantile, prediction_window):
     '''
-    This function applies a label of 1 to census tracts having
-    eviction rate higher than threshold, and 0 to the rest
-    of the census tracts.
     '''
-    
-    df[new_label_col] = np.where(df[label_col] >= threshold, 1, 0)
-    return df
+    df['next_year'] = df['year'] + 1 
+    small_df = df[['year', 'tract', 'eviction_filings_rate']]
+    small_df.columns = ['next_year', 'tract', 'eviction_filings_rate_next_year']
+    #create a master df, adding eviction filings rate next year to each row
+    master_df = pd.merge(left=df, right=small_df, on=['next_year', 'tract'])
+    print(master_df.columns)
+
+    years = master_df[year_col].unique().tolist()
+    for year in years:
+        threshold = get_threshold(master_df.loc[master_df[year_col] == (year + 1), label_col], quantile)
+        print(threshold)
+        master_df.loc[master_df['year'] == year, 'label'] = np.where(
+            master_df.loc[master_df['year'] == year, 'eviction_filings_rate_next_year'] >= threshold, 1, 0) 
+    return master_df
 
 
 def find_nuls(df):
@@ -124,7 +131,7 @@ def process_df(df, cols_to_discretize, num_bins, cats, cols_to_binary):
 
 
 def process_train_data(rv, cols_to_discretize, num_bins, 
-                       cats, cols_to_binary, label_col, new_label_col, k, option):
+                       cats, cols_to_binary):
     '''
     This function will consider the train and test set separately 
     and perform processing functions on each set
@@ -138,20 +145,6 @@ def process_train_data(rv, cols_to_discretize, num_bins,
                                      num_bins, cats, cols_to_binary)
         processed_test = process_df(test, cols_to_discretize, 
                                     num_bins, cats, cols_to_binary)
-        # create labels for train & test sets
-        processed_train.reset_index(inplace=True)
-        processed_test.reset_index(inplace=True)
-        # option 1 - use train and test's separate thresholds to create labels 
-        if option == 1:
-            train_threshold = get_threshold(processed_train, label_col, k)
-            processed_train = create_label(processed_train, label_col, new_label_col, train_threshold)
-            test_threshold = get_threshold(processed_test, label_col, k)
-            processed_test = create_label(processed_test, label_col, new_label_col, test_threshold)
-        # option 2 - use train's threshold for both sets
-        if option == 2:
-            train_threshold = get_threshold(processed_train, label_col, k)
-            processed_train = create_label(processed_train, label_col, new_label_col, train_threshold)
-            processed_test = create_label(processed_test, label_col, new_label_col, train_threshold)
         processed_rv[split_date] = [processed_train, processed_test]
     return processed_rv
 

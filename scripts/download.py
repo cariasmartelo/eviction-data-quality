@@ -701,7 +701,8 @@ def load_tract(tract_shp, keep_geom=False):
     return tract
 
 #####################Join dfs
-def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df, tract_df):
+def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df,
+               tract_df, gpds=False):
     '''
     Join dfs
     '''
@@ -709,7 +710,10 @@ def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df, tr
     return_df = pd.merge(return_df, education_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, crime_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, building_viol_df, on = ['tract', 'year'])
-    return_df = pd.merge(tract_df, return_df, on = 'tract')
+    if not gpds:
+        return_df = pd.merge(return_df, tract_df, on = 'tract')
+    else:
+        return_df = pd.merge(tract_df, return_df, on = 'tract')
     mean_by_commarea = return_df.groupby(['commarea', 'year']).mean().reset_index()  
     return_df = pd.merge(return_df, mean_by_commarea, on = ['commarea', 'year'],
     					 suffixes = ('', '_mean_by_commarea'))
@@ -721,5 +725,5 @@ if __name__ == "__main__":
     #download_eviction_data()
     #download_crime_data()
     #download_building_violation_data()
-    download_census_data()
+    #download_census_data()
     pass

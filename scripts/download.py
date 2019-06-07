@@ -1,9 +1,6 @@
 '''
-Machine Learning for Public Policy.
-Angelica Valdiviezo
-Chi Nguyen
-Camilo Arias
-Code to download data from eviction lab.
+Code to Download data for eviction proyect.
+Group 2
 '''
 import os
 import boto3
@@ -152,7 +149,7 @@ ACS_TABLES_KEYS = {
 #         print("Downloaded {} in {}".format('DATA_DICTIONARY.txt', filepath))
 
 
-######### CHI OP DATA ############
+######### DOWNLOADS ############
 
 def download_chiopdat_data(api_endpoint, year_from=None, year_to=None,
                            date_column='year', timestamp=False, limit=10000):
@@ -359,7 +356,10 @@ def download_tract_shapefile(filepath=None):
     print("Downloaded shape of Chicago tracts in {}"
           .format(filepath))
 
-######## MERGE THE DATABASES #########
+
+
+
+######## Prepare each DF for the merge
 
 
 def load_tract_shapefile(csv_file):
@@ -576,7 +576,7 @@ def impute_acs_data(df, acs=True, save=False, filepath=None, year_dict=None):
     return new_df
 
 
-########################## Final Load FUnctions
+########################## Load prepared data for Merge and do some modifs.
 
 def load_crime(csv_crime_csv):
     '''
@@ -688,16 +688,19 @@ def load_evict(evict_csv):
     
     return evict_df
 
-def load_tract(tract_shp):
+def load_tract(tract_shp, keep_geom=False):
     '''
     load tract
     '''
+    cols_to_keep = ['tract', 'commarea']
+    if keep_geom:
+    	cols_to_keep += ['location']
     tract = load_tract_shapefile(tract_shp)
-    tract = tract[['tract', 'commarea']]
+    tract = tract[cols_to_keep]
     tract['tract'] = tract['tract'].apply(lambda x: '{0:0>6}'.format(x))
     return tract
 
-
+#####################Join dfs
 def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df, tract_df):
     '''
     Join dfs
@@ -706,7 +709,7 @@ def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df, tr
     return_df = pd.merge(return_df, education_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, crime_df, on = ['tract', 'year'])
     return_df = pd.merge(return_df, building_viol_df, on = ['tract', 'year'])
-    return_df = pd.merge(return_df, tract_df, on = 'tract')
+    return_df = pd.merge(tract_df, return_df, on = 'tract')
     mean_by_commarea = return_df.groupby(['commarea', 'year']).mean().reset_index()  
     return_df = pd.merge(return_df, mean_by_commarea, on = ['commarea', 'year'],
     					 suffixes = ('', '_mean_by_commarea'))

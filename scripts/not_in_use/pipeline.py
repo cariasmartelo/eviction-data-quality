@@ -11,75 +11,91 @@ import matplotlib.pyplot as plt
 from sklearn import tree
 from shapely.geometry import Point
 import geopandas as gpd
-from datetime import datetime
+from datetime import datetime, timedelta
 
-CHICAGO_LIMITS = {'lat': (41, 43),
-                  'lon': (-88, -87)}
-
-
-
-def import_eviction_csv(csv_file):
+def load_from_csv(csv_file_path):
     '''
-    Import eviction data from csv file.
+    Load csv file with project data to a Pandas DataFrame.
     Inputs:
-        csv_file: String
+        csv_file: Str
     Output:
         Pandas DataFrame
     '''
-    eviction_lab_dtypes = {
-        'GEOID': int, 'year': int, 'name': str, 'parent-location': str,
-        'population': float, 'poverty-rate': float,
-        'renter-occupied-households': float, 'pct-renter-occupied': float,
-        'median-gross-rent': float, 'median-household-income': float,
-        'median-property-value': float, 'rent-burden' : float,
-        'pct-white': float, 'pct-af-am': float, 'pct-hispanic': float,
-        'pct-am-ind': float, 'pct-asian': float, 'pct-nh-pi': float,
-        'pct-multiple': float, 'pct-other': float, 'eviction-filings': float,
-        'evictions': float, 'eviction-rate': float, 'eviction-filing-rate': float,
-        'low-flag': float, 'imputed': float, 'subbed': float}
+    dtypes = {'projectid': str,
+              'teacher_acctid': str,
+              'schoolid ': str,
+              'school_ncesid': str,
+              'school_latitude': float,
+              'school_longitude': float,
+              'school_city': str,
+              'school_state': str,
+              'school_metro': str,
+              'school_district': str,
+              'school_county': str,
+              'school_charter': str,
+              'school_magnet': str,
+              'teacher_prefix': str,
+              'primary_focus_subject': str,
+              'primary_focus_are': str,
+              'secondary_focus_subject': str,
+              'secondary_focus_area': str,
+              'resource_type': str,
+              'poverty_level': str,
+              'grade_level': str,
+              'total_price_including_optional_support': float,
+              'students_reached': float,
+              'eligible_double_your_impact_match': str,
+              'date_posted': str,
+              'datefullyfunded': str}
+    to_int = {'f': 0,
+                  't': 1}
 
-    eviction_df = pd.read_csv(csv_file, dtype=eviction_lab_dtypes)
+    projects_df = pd.read_csv(csv_file_path, dtype=dtypes)
+    projects_df['date_posted'] = pd.to_datetime(projects_df['date_posted'],
+                                                format='%m/%d/%y')
+    projects_df['datefullyfunded'] = pd.to_datetime(projects_df['datefullyfunded'],
+                                                    format='%m/%d/%y')
+    for col in ['school_charter', 'school_magnet',\
+                'eligible_double_your_impact_match']:
+        projects_df[col] = projects_df[col].map(to_int)
 
-    return eviction_df
-
-def import_eviction_geojson(gpd_file):
-    '''
-    Import eviction data from geojson file.
-    Inputs:
-        gpd_file: String
-    Output:
-        GPD DataFrame
-    '''
-    eviction_gdf = gpd.read_file(gpd_file)
-
-    return eviction_gdf
+    return projects_df
 
 
-
-def create_outcome_var(eviction_df, days):
+def create_outcome_var(projects_df, days):
     '''
     Create variable True if project was fully funded within days days.
     Inputs:
-        eviction_df: Pandas DataFrame
+        projects_df: Pandas DataFrame
         days: int
     Output:
         Pandas DataFrame
     '''
-    df = eviction_df.loc[:]
+    df = projects_df.loc[:]
     df['days_untill_funded'] = (df['datefullyfunded'] - df['date_posted']).dt.days
     outcome_var = "not_funded_in_{}_days".format(days)
     df[outcome_var] = np.where(df['days_untill_funded'] > days, 1, 0)
 
-    return df
+    return df.drop('days_untill_funded', axis=1)
 
 
-def convert_to_geopandas(df, x_col, y_col):
+def load_us_map(shapefile_path):
+  '''
+  load us map shapefile into geopandas DataFrame.
+  Inputs:
+    shalefile_path: str
+  Output:
+    Geopandas DataFrame
+  '''
+  us_gdf = gpd.read_file(shapefile_path)
+  return us_gdf
+
+
+def convert_to_geopandas(projects_df):
     '''
     Converts the pandas dataframe to geopandas to plot.
     Inputs:
-        df Pandas Df
-        coordinates_col str
-
+        Pandas Df
     Output:
         Geopandas Df
     '''
@@ -92,22 +108,71 @@ def convert_to_geopandas(df, x_col, y_col):
             return np.NaN
         return shape(x)
 
-    df = df.loc[:]
-    df['coordinates'] = list(zip(df[x_col],
-                                 df[y_col]))
+    df = projects_df.loc[:]
+    df['coordinates'] = list(zip(df['school_longitude'],
+                                 df['school_latitude']))
     df['coordinates'] = df['coordinates'].apply(Point)
     geo_df = gpd.GeoDataFrame(df, crs = 'epsg:4326', geometry = df['coordinates'])
 
     return geo_df
 
 
-def see_histograms(eviction_df, columns=None, restrict=None):
+def map_projects(projects_gdf, us_gdf, colorcol, dense=True, agg='mean'):
     '''
-    Produce histograms of the numeric columns in eviction_df. If columns is
+    Produce a map of the projects in US. If dense = True, the map will 
+    be by states colored by agg function of colorcol. Else, the map will be
+    a sparse map of the schools. If count, the map will be a dense map colored
+    by frequency of schools in dataset. Cannot produce count sparce map.
+        Inputs:
+            projects_gdf: Geopandas DataFrame
+            us_gdf: Geopandas DataGrame
+            colorcol: str
+            dense: bool
+            agg: ('mean', 'meadian', 'max', 'mean', 'count') str
+    '''
+    if dense:
+        if agg == 'count':
+            project_by_state = (projects_gdf.groupby('school_state')
+                                            .size().reset_index())
+            project_by_state.rename(columns={0:'count'}, inplace = True)
+            colorcol = 'count'
+
+        else:
+            project_by_state = (projects_gdf.groupby('school_state')
+                                            .agg({colorcol: agg}))
+    
+        us_states_projs = us_gdf.merge(project_by_state, how='left',
+                            left_on='STATE_ABBR', right_on = 'school_state')
+        
+    ax = us_gdf.plot(color="grey")
+    if dense:
+        us_states_projs.plot(ax=ax, column=colorcol, cmap='viridis',
+                             legend=True)
+        if agg == 'count':
+            ax.set_title('Frequency of schools in US by State\n'
+                         '(States without schools in grey)')
+        else:
+            ax.set_title('{} of {} in US by State\n(States without data'
+                         ' in grey)'.format(agg.capitalize(),
+                                            " ".join(colorcol.split("_"))
+                                                .capitalize()))
+        plt.show()
+
+    else:
+        projects_gdf.plot(ax=ax, column=colorcol, cmap='viridis',
+                          legend=True, marker='.', markersize=2)
+        ax.set_title('Project Schools in US by State by {} \n(States without data'
+                         ' in grey)'.format(colorcol))
+        plt.show()
+
+
+def see_histograms(project_df, columns=None, restrict=None):
+    '''
+    Produce histograms of the numeric columns in project_df. If columns is
     specified, it produces histograms of those columns. If restrict dictionary
     is specified, restricts to the values inside the percentile range specified.
     Inputs:
-        eviction_df: Pandas DataFrame
+        credit_df: Pandas DataFrame
         columns: [colname]
         restrict = dict
     Output:
@@ -119,30 +184,27 @@ def see_histograms(eviction_df, columns=None, restrict=None):
     if not restrict:
         restrict = {}
     if not columns:
-        columns = eviction_df.columns
+        columns = project_df.columns
     for column in columns:
-        print(column)
-        if not eviction_df[column].dtype.kind in 'ifbc':
-            try:
-                if eviction_df[column].nunique() <= 15:
-                    eviction_df[column].value_counts(sort=False).plot(kind='bar')
-                    plt.tight_layout()
-                    plt.title(column)
-                continue
-            except: continue
-        if eviction_df[column].dtype.kind in 'c':
-            eviction_df[column].value_counts().plot(kind='bar')
+        if not project_df[column].dtype.kind in 'ifbc':
+            if project_df[column].nunique() <= 15:
+                project_df[column].value_counts(sort=False).plot(kind='bar')
+                plt.tight_layout()
+                plt.title(column)
+            continue
+        if project_df[column].dtype.kind in 'c':
+            project_df[column].value_counts().plot(kind='bar')
 
-        if eviction_df[column].dtype.kind in 'c':
+        if project_df[column].dtype.kind in 'c':
 
             continue
         if column in restrict:
-            min_val = eviction_df[column].quantile(restrict[column][0])
-            max_val = eviction_df[column].quantile(restrict[column][1])
-            col_to_plot = (eviction_df.loc[(eviction_df[column] <= max_val)
-                             & (eviction_df[column] >= min_val), column])
+            min_val = project_df[column].quantile(restrict[column][0])
+            max_val = project_df[column].quantile(restrict[column][1])
+            col_to_plot = (project_df.loc[(project_df[column] <= max_val)
+                             & (project_df[column] >= min_val), column])
         else:
-            col_to_plot = eviction_df[column]
+            col_to_plot = project_df[column]
 
         num_bins = min(20, col_to_plot.nunique())
 
@@ -154,84 +216,87 @@ def see_histograms(eviction_df, columns=None, restrict=None):
     plt.show()
 
 
-def summary_by_var(eviction_df, column, funct='mean', count=False):
+def summary_by_var(project_df, column, funct='mean', count=False):
     '''
     See data by binary column, aggregated by function.
     Input:
-        eviction_df: Pandas DataFrame
+        credit_df: Pandas DataFrame
         funct: str
     Output:
         Pandas DF
     '''
     if not count:
-        sum_table =  eviction_df.groupby(column).agg('mean').T
+        sum_table =  project_df.groupby(column).agg('mean').T
     else:
-        sum_table = eviction_df.groupby(column).size().T
-    #sum_table['perc diff'] = ((sum_table[1] / sum_table[0]) -1) * 100
+        sum_table = credit_df.groupby(column).size().T
+    sum_table['perc diff'] = ((sum_table[1] / sum_table[0]) -1) * 100
 
     return sum_table
 
 
-def make_dummies_from_categorical(eviction_df, columns, dummy_na=False):
+def make_dummies_from_categorical(project_df, columns=None, dummy_na=False):
     '''
     Function that takes a Pandas DataFrame and creates dummy variables for 
     the columns specified. If dummy_na True, make dummy for NA values.
-        eviction_df: Pandas DataFrame.
+        projec_df: Pandas DataFrame.
         columns: [str]
         dummy_na: bool
     Output:
         Pandas Data Frame.
     '''
-    #df = eviction_df.loc[:]
-    #for col in columns:
-    dummies = pd.get_dummies(eviction_df, dummy_na=dummy_na, columns= columns)
-    #    df = df.join(dummies)
+    to_dummy = project_df.loc[:,project_df.nunique() < 100]
+
+    dummies = pd.get_dummies(to_dummy, dummy_na=dummy_na, columns=columns)
 
     return dummies
 
 
-def delete_columns(eviction_df, columns):
+def delete_columns(project_df, columns):
     '''
     Deletes columns of dataframe.
     Inputs:
-        eviction_df: Pandas DataFrame.
+        projec_df: Pandas DataFrame.
         columns: [str]
     Output:
         Pandas DataFrame
     '''
-    df = eviction_df.loc[:]
+    df = project_df.loc[:]
     return df.drop(columns, axis=1)
 
 
-def discretize(serie, bins, equal_width=False, string=False):
+def discretize(project_df, bins, equal_width=False, string=True):
     '''
-    Function to discretize a pandas series based on number of bins and
-    wether bins are equal width, or have equal number of observations.
-    If string = True, returns string type.
+    Function that takes a Pandas DataFrame and creates discrete variables for 
+    the columns specified.
     Inputs:
-        serie: Pandas Series
+        projects_df: Pandas DataFrame
         bins: int(num of bins)
         equal_width: bool
+        string: book
     Output:
         Pandas Series.
     '''
+    to_discretize = project_df.loc[:,(project_df.dtypes == 'int')\
+                                    | (project_df.dtypes == 'float')]
+    to_discretize = to_discretize.loc[:, to_discretize.nunique() > 30]
+
     if not equal_width:
-        return_serie =  pd.qcut(serie, bins)
+        discretized =  to_discretize.apply(lambda x: pd.qcut(x, bins, labels=False))
     else:
-        return_serie = pd.cut(serie, bins)
+        discretized =  to_discretize.apply(lambda x: pd.cut(x, bins, labels=False))
     if string:
-        return_serie = return_serie.astype(str)
+        discretized = discretized.astype(str)
 
-    return return_serie
+    return pd.concat([project_df, discretized.add_prefix('discr_')], axis=1)
 
 
-def see_scatterplot(eviction_df, xcol, ycol, colorcol=None, logx=False,
+def see_scatterplot(project_df, xcol, ycol, colorcol=None, logx=False,
                     logy=False, xjitter=False, yjitter=False):
     '''
-    Print scatterplot of columns specified of the eviction_df. If color column
+    Print scatterplot of columns specified of the credit df. If color column
     is specified, the scatterplot will be colored by that column.
     Input:
-        eviction_df: Pandas DataFrame
+        credit_df: Pandas DataFrame
         xcol: String
         ycol: String
         colorcol: String
@@ -240,7 +305,7 @@ def see_scatterplot(eviction_df, xcol, ycol, colorcol=None, logx=False,
     Output:
         Graph
     '''
-    df_to_plot = eviction_df.loc[:]
+    df_to_plot = credit_df.loc[:]
     if xjitter:
         df_to_plot[xcol] = df_to_plot[xcol] +\
             np.random.uniform(-0.5, 0.5, len(df_to_plot[xcol]))\
@@ -257,305 +322,71 @@ def see_scatterplot(eviction_df, xcol, ycol, colorcol=None, logx=False,
     else:
         df_to_plot.plot.scatter(x=xcol, y=ycol, c=colorcol, cmap='viridis',
                                legend=True, logx=logx, logy=logy)
-    plt.title('Scatterplot of Eviction DataFrame \n {} and {}'
+    plt.title('Scatterplot of Credit DataFrame \n {} and {}'
                   .format(xcol, ycol))
     plt.show()
 
 
-def plot_map(eviction_gdf, variable, year, geography_name):
-    '''
-    Map by zip code the value of the column indicated in colorcol and the year.
-    Inputs:
-        eviction_gdf: GeoDataFrame
-        variable: Str
-        year: int
-        geography_name: str
-    Output:
-        Map
-    '''
-    col_dict = {
-        'n': 'name', 'pl': 'parent-location', 'p': 'population',
-        'pro': 'pct-renter-occupied', 'mgr': 'median-gross-rent',
-        'mhi': 'median-household-income', 'mpv': 'median-property-value',
-        'rb': 'rent-burden', 'roh': 'renter-occupied-households',
-        'pr': 'poverty-rate', 'pw': 'pct-white', 'paa': 'pct-af-am',
-        'ph': 'pct-hispanic', 'pai': 'pct-am-ind', 'pa': 'pct-asian',
-        'pnp': 'pct-nh-pi', 'pm': 'pct-multiple', 'po': 'pct-other',
-        'e': 'evictions', 'ef': 'eviction-filings', 'er': 'eviction-rate',
-        'efr': 'eviction-filing-rate', 'lf': 'low-flag'}
-
-    colorcol = {v: i for i, v in col_dict.items()}[variable]
-    colorcol += '-' + str(year)[-2:] #Use variable and year to get column name
-
-    fig, ax = plt.subplots(figsize=(8, 12))
-    eviction_gdf.plot(color="grey", ax=ax, edgecolor="black")
-    eviction_gdf[eviction_gdf[colorcol].notna()].plot(ax=ax, column=colorcol,
-                                                      cmap='viridis',
-                                                      scheme='quantiles',
-                                                      legend=True)
-
-    ax.set_title('Tracts of {} by {} in {}\n(Tracts without data'
-                 ' in grey)'.format(geography_name, " ".join(variable.split("-")),
-                                    year))
-    plt.show()
-
-
-def map_crimes_loc(geo_tract, geo_crime, filter_col=None, filter_vals=None, color_col=None):
-    '''
-    Produce a map of the crimes location in Chicago over a tract map.
-    Inputs:
-        geo_comm: GeoPandasDf
-        geo_crime: GeoPandasDf
-        filter_col: Str
-        filter_vals: [str]
-        color_col: str
-    '''
-    plt.clf()
-    geo_crime = geo_crime[(geo_crime['latitude'].between(CHICAGO_LIMITS['lat'][0],
-                                                        CHICAGO_LIMITS['lat'][1]))
-                        & (geo_crime['longitude'].between(CHICAGO_LIMITS['lon'][0],
-                                                          CHICAGO_LIMITS['lon'][1]))]
-    plt.clf()
-    base = geo_tract.plot(color='white', edgecolor='black')
-    if filter_col:
-        if not color_col:
-            geo_crime[geo_crime[filter_col] == filter_vals].plot(ax=base, marker='.',
-                color = 'red', markersize=4, legend = True)
-        else:
-            geo_crime[geo_crime[filter_col] == filter_vals].plot(ax=base, marker='.',
-                column = color_col, markersize=4, legend = True)
-    else:
-        if not color_col:
-            geo_crime.plot(ax=base, marker='.',
-                color = 'red', markersize=4, legend = True)
-        else:
-            geo_crime.plot(ax=base, marker='.',
-                column = color_col, markersize=4, legend = True)
-    if not filter_col:
-        plt.title('Crimes in Chicago (2017 and 2018)')
-    else:
-        plt.title('{}s in Chicago (2017 and 2018)'
-                  .format(filter_vals.capitalize()))
-    plt.show()
-    plt.clf()
-
-
-def set_semester(date_series):
+def group_by_days(date_series, days):
     '''
     Returns a pandas Series that indicates the semester of the date series
     as an integer from 0 to 3 (0 -> first semester of 2012, 3-> last semester
     of 2013)
     Inputs:
         date_series: Datetime series
+    Output:
+        Pandas Series
     '''
-    bins = pd.date_range('2012-07-01', end='2014-1-31', freq='183d')
+    start = date_series.min() + timedelta(days = days)
+    end = date_series.max()
+    bins = pd.date_range(start, end=end, freq='{}d'.format(days))
 
-    def _semester(x, bins):
+    def _group(x, bins):
         rv = 0
         for i, v in enumerate(bins):
             if x >= v:
                 rv += 1
         return rv
-    return (date_series.apply(_semester, args=(bins,)), len(bins))
+    return (date_series.apply(_group, args=(bins,)), len(bins))
 
-
-
-def convert_to_geopandas(df):
+def get_all_combinations(model_dict):
     '''
-    Converts the pandas dataframe to geopandas DataFrame
+    From a dictionary with all the models and all the parameters, 
+    returns a dictionary of models mapped to a list of different
+    specifications.
     Inputs:
-        df: Pandas DataFrame
+        model_dict: dict
     Output:
-        Geopandas DataFrame
+        dict
     '''
-    def shape_(x):
+    #setting up all combinations
+    models = {}
+    for classifier, parameters in model_dict.items():
+        models[classifier] = []
+        keyword_params = [param for param in parameters]
+        options = [option for option in parameters.values()]
+        num_of_params = len(options)
+        combinations = []
+        for option_1 in options[0]:
+            if num_of_params < 2:
+                combinations.append((option_1,))
+                continue
+            for option_2 in options[1]:
+                if num_of_params < 3:
+                    combinations.append((option_1, option_2))
+                    continue
+                for option_3 in options[2]:
+                    if num_of_params < 4:
+                        combinations.append((option_1, option_2, option_3))
+                        continue
+                    for option_4 in options[3]:
+                        if num_of_params < 5:
+                            combinations.append((option_1, option_2, option_3, option_4))
+                            continue
+        for combination in combinations:
+            specification = {} 
+            for i, keyword_param in enumerate(keyword_params):
+                specification[keyword_param] = combination[i]
+            models[classifier].append(specification)
+    return models
 
-        '''
-        Convert JSON location attribute to shapely.
-        '''
-        if isinstance(x, float):
-            return np.NaN
-        return shape(x)
-
-
-    df['geometry'] = df.location.apply(shape_)
-    geo_df = gpd.GeoDataFrame(df, crs = 'epsg:4326', geometry = df['geometry'])
-
-    return geo_df
-
-def make_cross_var_year(df1, df2, df3, var):
-    '''
-    Make cross tab of type of crime and year.
-    Input:
-        df: Pandas DF
-        var: str
-    Output:
-        Pandas DF
-    '''
-    mean_by_year1 = df1.groupby('year').agg({var: 'mean'})
-    mean_by_year2 = df2.groupby('year').agg({var: 'mean'})
-    mean_by_year3 = df3.groupby('year').agg({var: 'mean'})
-    mean_by_year = pd.merge(mean_by_year1, mean_by_year2, left_index=True,
-                            right_index=True)
-    mean_by_year = pd.merge(mean_by_year, mean_by_year3, left_index=True,
-                            right_index=True)
-    mean_by_year.columns = ['Chicago', 'NYC', 'Charleston']
-
-    # cross_var_year.rename(columns={'All' : 'Total'}, index={'All' : 'Total'},\
-    #     inplace = True)
-    # cross_var_year['Perc Change'] = (cross_var_year[2018] / 
-    #                                   cross_var_year[2017] - 1) * 100
-    # cross_var_year['Perc Change'] = cross_var_year['Perc Change'].round(2)
-    # cross_var_year = cross_var_year[['Total', 2017, 2018, 'Perc Change']]
-    # cross_var_year.replace(float('inf'), np.NaN, inplace = True)
-    # cross_var_year.sort_values('Total', ascending = False)
-    # cross_var_year.index = cross_var_year.index.str.capitalize()
-    # cross_var_year.rename_axis(var.upper().replace("_", " "), inplace = True)
-    # cross_var_year.rename_axis("", axis = 1,  inplace = True)
-    #cross_class_year.sort_values('Total', ascending = False, inplace = True)
-
-    return mean_by_year
-
-def describe(eviction_df, var_type=None, variable=None, by_year=False):
-    '''
-    Get descriptive stats of the variables that belong to var_type.
-    Inputs:
-        eviction_df: Pandas DataFrame
-        var_type: 'demographics', 'real-estate' or 'evictions' (string)
-        variable: Specific variable
-    '''
-    var_classification = {
-        'demographics': ['population', 'poverty-rate', 'median-household-income',
-                         'pct-white', 'pct-af-am', 'pct-hispanic', 'pct-am-ind',
-                         'pct-asian', 'pct-nh-pi', 'pct-multiple', 'pct-other'],
-        'real-estate': ['renter-occupied-households', 'pct-renter-occupied',
-                        'median-gross-rent', 'median-property-value',
-                        'rent-burden'],
-        'evictions': ['eviction-filings', 'evictions', 'eviction-rate',
-                      'eviction-filing-rate']}
-    if variable:
-        if by_year:
-            return eviction_df.groupby(year, variable).agg('mean')
-
-    if not var_type:
-        print(eviction_df.describe())
-    else:
-        print(eviction_df[var_classification[var_type]].describe())
-
-
-def make_bar_plot(describe_df):
-    describe_df.plot.bar()
-    plt.title('Eviction rate')
-    plt.show()
-
-def plot_map(eviction_gdf, variable, year, geography_name):
-    '''
-    Map by zip code the value of the column indicated in colorcol and the year.
-    Inputs:
-        eviction_gdf: GeoDataFrame
-        variable: Str
-        year: int
-        geography_name: str
-    Output:
-        Map
-    '''
-    col_dict = {
-        'n': 'name', 'pl': 'parent-location', 'p': 'population',
-        'pro': 'pct-renter-occupied', 'mgr': 'median-gross-rent',
-        'mhi': 'median-household-income', 'mpv': 'median-property-value',
-        'rb': 'rent-burden', 'roh': 'renter-occupied-households',
-        'pr': 'poverty-rate', 'pw': 'pct-white', 'paa': 'pct-af-am',
-        'ph': 'pct-hispanic', 'pai': 'pct-am-ind', 'pa': 'pct-asian',
-        'pnp': 'pct-nh-pi', 'pm': 'pct-multiple', 'po': 'pct-other',
-        'e': 'evictions', 'ef': 'eviction-filings', 'er': 'eviction-rate',
-        'efr': 'eviction-filing-rate', 'lf': 'low-flag'}
-
-    colorcol = {v: i for i, v in col_dict.items()}[variable]
-    colorcol += '-' + str(year)[-2:] #Use variable and year to get column name
-
-    fig, ax = plt.subplots(figsize=(8, 12))
-    eviction_gdf.plot(color="grey", ax=ax, edgecolor="black")
-    eviction_gdf[eviction_gdf[colorcol].notna()].plot(ax=ax, column=colorcol,
-                                                      cmap='viridis',
-                                                      scheme='quantiles',
-                                                      legend=True)
-
-    ax.set_title('Tracts of {} by {} in {}\n(Tracts without data'
-                 ' in grey)'.format(geography_name, " ".join(variable.split("-")),
-                                    year))
-    plt.show()
-
-
-def see_scatterplot(eviction_df, xcol, ycol, colorcol=None, logx=False,
-                    logy=False, xjitter=False, yjitter=False):
-    '''
-    Print scatterplot of columns specified of the eviction df. If color column
-    is specified, the scatterplot will be colored by that column.
-    Input:
-        eviction_df: Pandas DataFrame
-        xcol: String
-        ycol: String
-        colorcol: String
-        logx, logy: bool
-        xiitter, yitter: bool
-    Output:
-        Graph
-    '''
-    df_to_plot = eviction_df.loc[:]
-    if xjitter:
-        df_to_plot[xcol] = df_to_plot[xcol] +\
-            np.random.uniform(-0.5, 0.5, len(df_to_plot[xcol]))\
-            *df_to_plot[xcol].std()
-    if yjitter:
-        df_to_plot[ycol] = df_to_plot[ycol] +\
-            np.random.uniform(-0.5, 0.5, len(df_to_plot[ycol]))\
-            *df_to_plot[ycol].std()
-
-    plt.clf()
-    if not colorcol:
-        df_to_plot.plot.scatter(x=xcol, y=ycol, legend=True, logx=logx,
-                                logy=logy)
-    else:
-        df_to_plot.plot.scatter(x=xcol, y=ycol, c=colorcol, cmap='viridis',
-                                legend=True, logx=logx, logy=logy)
-    plt.title('Scatterplot of eviction DataFrame \n {} and {}'
-              .format(xcol, ycol))
-    plt.show()
-
-
-def see_histograms(eviction_df, geo_area, col, years=None, restrict=None):
-    '''
-    Produce histograms of the numeric columns in credit_df. If columns is
-    specified, it produces histograms of those columns. If restrict dictionary
-    is specified, restricts to the values inside the percentile range specified.
-    Inputs:
-        credit_df: Pandas DataFrame
-        col: str
-        yeard: [int]
-    Output:
-        Individual Graphs (Num of graphs = Num of numeric cols)
-    '''
-    plt.clf()
-    figs = {}
-    axs = {}
-    if not years:
-        years = range(2000, 2017, 4)
-    for year in years:
-        col_to_plot = eviction_df.loc[eviction_df['year'] == year, col]
-        if col_to_plot.isna().all():
-            continue
-        if restrict:
-            min_val = col_to_plot.quantile(restrict[0])
-            max_val = col_to_plot.quantile(restrict[1])
-            col_to_plot = col_to_plot.loc[(col_to_plot <= max_val)
-                             & (col_to_plot >= min_val)]
-
-        num_bins = min(20, col_to_plot.nunique())
-
-        figs[col] = plt.figure()
-        axs[col] = figs[col].add_subplot(111)
-        n, bins, patches = axs[col].hist(col_to_plot, num_bins,
-                                         facecolor='blue', alpha=0.5)
-        title = geo_area + ', '+ str(year) + "\n" + " ".join(col.split("-"))
-        axs[col].set_title(title)
-    plt.show()

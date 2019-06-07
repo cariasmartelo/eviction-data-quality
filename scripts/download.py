@@ -643,6 +643,7 @@ def load_acs(acs_filename):
                          'population_race_other'])
     acs_df[population_types]= acs_df[population_types].apply\
                               (lambda x: x/acs_df['population_total'])
+    acs_df = acs_df.drop('Unnamed: 0', axis=1)
     return acs_df
 
 def load_education(education_filename):
@@ -653,6 +654,7 @@ def load_education(education_filename):
     education_df['tract'] = education_df['tract'].astype(int)
     education_df['tract'] = education_df['tract'].apply(lambda x: '{0:0>6}'.format(x)) 
     education_df['tract'] = education_df['tract'].astype(str)
+    education_df = education_df.drop(['Unnamed: 0', 'Unnamed: 0.1'], axis=1)
     return education_df
 
 def load_evict(evict_csv):

@@ -49,14 +49,17 @@ def create_label(df, year_col, label_col, quantile, prediction_window):
     small_df.columns = ['next_year', 'tract', 'eviction_filings_rate_next_year']
     #create a master df, adding eviction filings rate next year to each row
     master_df = pd.merge(left=df, right=small_df, on=['next_year', 'tract'])
-    print(master_df.columns)
 
     years = master_df[year_col].unique().tolist()
     for year in years:
         threshold = get_threshold(master_df.loc[master_df[year_col] == (year + 1), label_col], quantile)
-        print(threshold)
         master_df.loc[master_df['year'] == year, 'label'] = np.where(
-            master_df.loc[master_df['year'] == year, 'eviction_filings_rate_next_year'] >= threshold, 1, 0) 
+            master_df.loc[master_df['year'] == year, 'eviction_filings_rate_next_year'] >= threshold, 1, 0)
+        prev_threshold  = get_threshold(master_df.loc[master_df[year_col] == (year), label_col], quantile)
+        master_df.loc[master_df['year'] == year, 'label_prev_year'] = np.where(
+            master_df.loc[master_df['year'] == year, label_col] >= prev_threshold, 1, 0)
+
+
     return master_df
 
 
@@ -81,7 +84,8 @@ def fill_null_cols(df, null_col_list):
             continue
 
 
-def discretize_cols(df, old_col, num_bins=3, cats=False):
+# def discretize_cols(df, old_col, num_bins=3, cats=False):
+def discretize_cols(serie, num_bins=3, cats=False):
     '''
     This function converts a list of continous columns into categorical
     Inputs:
@@ -91,14 +95,19 @@ def discretize_cols(df, old_col, num_bins=3, cats=False):
         - cats: a list of categories to organize the continuous values into
     Returns a pandas dataframe
     '''
-    new_col = old_col + '_group'
-    df[new_col] = pd.cut(df[old_col], 
-                         bins=num_bins, 
-                         labels=cats, 
-                         right=True, 
-                         include_lowest=True)
-    return df
-
+    # new_col = old_col + '_group'
+    # df[new_col] = pd.cut(df[old_col], 
+    #                      bins=num_bins, 
+    #                      labels=cats, 
+    #                      right=True, 
+    #                      include_lowest=True)
+    # return df
+    rv = pd.cut(serie, 
+                bins=num_bins, 
+                labels=cats, 
+                right=True, 
+                include_lowest=True)
+    return rv
 
 def convert_to_binary(df, cols_to_transform):
     '''
@@ -107,7 +116,6 @@ def convert_to_binary(df, cols_to_transform):
         - df (dataframe)
         - cols_to_transform (list)
     '''
-    df = df.loc[:,df.nunique() < 50]
     df = pd.get_dummies(df, dummy_na=True, columns=cols_to_transform)
     return df
 
@@ -126,8 +134,11 @@ def process_df(df, cols_to_discretize, num_bins, cats, cols_to_binary):
     a dataframe
     '''
     fill_null_cols(df, find_nuls(df))
-    for col in cols_to_discretize:
-        processed_df = discretize_cols(df, col, num_bins, cats)
+    # for col in cols_to_discretize:
+    #     processed_df = discretize_cols(df, col, num_bins, cats)
+    discrete = df[cols_to_discretize].apply(discretize_cols, args = (num_bins, cats))
+    discrete = discrete.add_suffix('_group')
+    processed_df = pd.concat([df, discrete], axis=1)
     processed_df = convert_to_binary(processed_df, cols_to_binary)
     return processed_df
 
@@ -279,38 +290,19 @@ def temporal_validation(df, date_col, prediction_window, start_time, end_time, l
         len_train += 12
     return rv
 
-def discretize(project_df, bins, equal_width=False, string=True):
+def get_continuous_variables(df, nunique=30):
     '''
-    Function that takes a Pandas DataFrame and creates discrete variables for 
-    the columns specified.
+    Get the colname of the continuous functions that have more than nunique
+    unique values.
     Inputs:
-        projects_df: Pandas DataFrame
-        bins: int(num of bins)
-        equal_width: bool
-        string: book
+        df DataFrame
+        nunique: int
     Output:
-        Pandas Series.
+        list of colnames
     '''
-    to_discretize = project_df.loc[:,(project_df.dtypes == 'int')\
-                                    | (project_df.dtypes == 'float')]
-    to_discretize = to_discretize.loc[:, to_discretize.nunique() > 30]
-
-    if not equal_width:
-        discretized =  to_discretize.apply(lambda x: pd.qcut(x, bins, labels=False))
-    else:
-        discretized =  to_discretize.apply(lambda x: pd.cut(x, bins, labels=False))
-    if string:
-        discretized = discretized.astype(str)
-
-    return pd.concat([project_df, discretized.add_prefix('discr_')], axis=1)
-
-def process_df_2(df, num_bins):
-    '''
-    This function puts together all the processing steps necessary for
-    a dataframe
-    '''
-    fill_null_cols(df, find_nuls(df))
-    discretized = discretize(df, num_bins)
-    processed_df = convert_to_binary(discretized)
-    return processed_df
+    to_discretize = df.loc[:,(df.dtypes == 'int')\
+                           | (df.dtypes == 'float')]
+    to_discretize = to_discretize.loc[:, to_discretize.nunique() > nunique]
+    cols_to_discretize = list(to_discretize.columns)
+    return list(cols_to_discretize)
 

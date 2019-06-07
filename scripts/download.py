@@ -592,6 +592,7 @@ def load_crime(csv_crime_csv):
     crimes_increase = crime_df.sort_values(['tract', 'year'])\
                         .set_index(['tract', 'year'])\
                         [to_increase].pct_change()
+    crimes_increase = crimes_increase.applymap(lambda x: 1 if x >= 1 else x)
     crimes_increase = crimes_increase.add_prefix('perc_increase_')
     crimes_increase = crimes_increase.reset_index()
     crimes_increase.loc[crimes_increase.index[crimes_increase['year'] == 2010],2:]\

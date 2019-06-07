@@ -43,6 +43,7 @@ def get_threshold(num_array, quantile):
 def create_label(df, year_col, label_col, quantile, prediction_window):
     '''
     '''
+    df = df.iloc[:,:]
     df['next_year'] = df['year'] + 1 
     small_df = df[['year', 'tract', 'eviction_filings_rate']]
     small_df.columns = ['next_year', 'tract', 'eviction_filings_rate_next_year']
@@ -106,6 +107,7 @@ def convert_to_binary(df, cols_to_transform):
         - df (dataframe)
         - cols_to_transform (list)
     '''
+    df = df.loc[:,df.nunique() < 50]
     df = pd.get_dummies(df, dummy_na=True, columns=cols_to_transform)
     return df
 
@@ -130,7 +132,7 @@ def process_df(df, cols_to_discretize, num_bins, cats, cols_to_binary):
     return processed_df
 
 
-def process_train_data(rv, cols_to_discretize, num_bins, 
+def process_train_data(rv, cols_to_discretize, num_bins,
                        cats, cols_to_binary):
     '''
     This function will consider the train and test set separately 
@@ -145,6 +147,7 @@ def process_train_data(rv, cols_to_discretize, num_bins,
                                      num_bins, cats, cols_to_binary)
         processed_test = process_df(test, cols_to_discretize, 
                                     num_bins, cats, cols_to_binary)
+
         processed_rv[split_date] = [processed_train, processed_test]
     return processed_rv
 
@@ -275,4 +278,39 @@ def temporal_validation(df, date_col, prediction_window, start_time, end_time, l
         #once done, move test end time backward
         len_train += 12
     return rv
+
+def discretize(project_df, bins, equal_width=False, string=True):
+    '''
+    Function that takes a Pandas DataFrame and creates discrete variables for 
+    the columns specified.
+    Inputs:
+        projects_df: Pandas DataFrame
+        bins: int(num of bins)
+        equal_width: bool
+        string: book
+    Output:
+        Pandas Series.
+    '''
+    to_discretize = project_df.loc[:,(project_df.dtypes == 'int')\
+                                    | (project_df.dtypes == 'float')]
+    to_discretize = to_discretize.loc[:, to_discretize.nunique() > 30]
+
+    if not equal_width:
+        discretized =  to_discretize.apply(lambda x: pd.qcut(x, bins, labels=False))
+    else:
+        discretized =  to_discretize.apply(lambda x: pd.cut(x, bins, labels=False))
+    if string:
+        discretized = discretized.astype(str)
+
+    return pd.concat([project_df, discretized.add_prefix('discr_')], axis=1)
+
+def process_df_2(df, num_bins):
+    '''
+    This function puts together all the processing steps necessary for
+    a dataframe
+    '''
+    fill_null_cols(df, find_nuls(df))
+    discretized = discretize(df, num_bins)
+    processed_df = convert_to_binary(discretized)
+    return processed_df
 

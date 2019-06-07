@@ -13,218 +13,129 @@ import pipeline as ppln
 import classifiers as classif
 from sklearn.model_selection import TimeSeriesSplit
 
-def update_dict(results_dict, metrics, model_name, cross_k, threshold):
+def update_dict(results_dict, metrics, model_name, cross_k, top_k,
+                specification):
     '''
-    Update results dictionary using metrics from model.
+    THis function helps the run function update the dictionary with the
+    results of the model. It takes a dictionary of the results so far and
+    a dictionary of the metrics and updates the former one.
     Inputs:
         results_dict: dict
         model_name: name
-        cross:k: int
+        cross_k: int
         metrics: dict
+        top_k: float
+        specification: dict
     '''
     results_dict['model'].append(model_name)
+    results_dict['parameters'].append(str(specification))
     results_dict['cross_k'].append(cross_k)
-    results_dict['threshold'].append(threshold)
+    results_dict['top_k'].append(top_k)
     results_dict['precision'].append(metrics['precision'])
     results_dict['recall'].append(metrics['recall'])
     results_dict['AUC ROC'].append(metrics.get('roc auc', 0))
 
     return results_dict
 
-def run_model(x_train, y_train, x_test, classif_model, model_params):
+def get_iter_train_test(groups_serie, test_size, wait_size, num_of_trains):
     '''
-    Create classification model and return y_score. The function takes model,
-    which is a function, and a dict with the parameters of that model.
+    From a categorical Pandas Series that indicates the teporal classification
+    of each observation, construct a list of lost of  train and test indexes to
+    create the temporal holdouts. It takes into consideration the time
+    that needs to be kept between training and testing. Test size and wait size
+    indicate the number of temporal units of each of those. For example, if groups
+    indicate bimesters, test_size of two would indicate that the testing is foo periods
+    of 4 months. In this prediction I mapped everything to bimesters, so the test size
+    is 3 (3 bimesters) and the wait_size if of 1 (1 bimester)
     Inputs:
-        x_train: Pandas Series
-        y_train: Pandas Series
-        x_test: Pandas Series
-        classif_model: function
-        model_params: dict
+        groups_serie: Pandas Series
+        test_size: int
+        wait_size: int
+        num_of_trains: int
     '''
-    model = classif_model(y_train, x_train, **model_params)
-    y_score = classif.predict_proba(model, x_test)
+    groups = [i for i in range(groups_serie.nunique())]
+    train_indexes = [[i for i in range(test_size)]]
+    for i in range(num_of_trains -1):
+        new_train = [i + test_size for i in train_indexes[-1][-test_size:]]
+        train_indexes.append(train_indexes[-1] + new_train)
+    wait_groups = [i for i in range(wait_size)]
+    wait_index = [[w + tr[-1] + 1] for w in wait_groups for tr in train_indexes]
+    test_groups = [i for i in range(test_size)]
+    test_indexes = [[t + w[-1] + 1 for t in test_groups] for w in wait_index]
 
-    return y_score
+    return (train_indexes, test_indexes)
 
-def run_(x, y, semester, params):
+
+def run(x, y, groups_serie, test_size, wait_size, num_of_trains, models_dict,
+        seed, top_ks, n_bins):
     '''
-    run cross validation and produce output df.
+    run cross validation and produce output dict. The function takes the x and y
+    DataFrames, a Pandas Series indicating the time group each observation is part
+    of, a dictionary that has the models to run and the parameters of each, the
+    size of the test in terms of groups and the size of the wait in terms of groups.
+    It takes a random seed and the number of bins to discretize continuous variables.
     Inputs:
         x: Pandas DataFrame
         y: Pandas Series
-        semester: Pandas Series
-        pamarams: dict
+        groups: Pandas Series
+        models_dict: dict
+        testsize: Number of groups in test
+        wait_size: Number of groups in wait
+        num_of_trains: int
     Output:
         dict
     '''
+
+    #Setting initial model
     results = {'model': [],
+               'parameters': [],
                'cross_k': [],
-               'threshold': [],
+               'top_k': [],
                'precision': [],
                'recall': [],
                'AUC ROC': []}
 
-    models_funcitons = {
-        'KNN': classif.build_knn,
-        'decision_tree': classif.build_tree,
-        'logistic_reg': classif.build_logistic_reg,
-        'svm': classif.build_svm,
-        'random_forest': classif.build_random_forest,
-        'gradient_boost': classif.build_gradient_boost}
-
     cross_k = 0
-    semesters = semester.nunique()
-    tscv = TimeSeriesSplit(n_splits=semesters - 1)
-    for train_index, test_index in tscv.split(range(semesters)):
+
+    ##Creating the list of train and test indexes that will help make the temporal
+    ##holdouts.
+    train_indexes, test_indexes = get_iter_train_test(groups_serie, test_size,
+                                                      wait_size, num_of_trains)
+    for i, train_index in enumerate(train_indexes):
         cross_k += 1
         print("Begining cross k: {}".format(cross_k))
-        x_train = x[semester.isin(train_index)]
-        y_train = y[semester.isin(train_index)]
-        x_test = x[semester.isin(test_index)]
-        y_test = y[semester.isin(test_index)]
-        print("Train set has {} rows, with semester values of {}"
-                .format(len(x_train), train_index))
-        print("Test set has {} rows, with semester values of {}"
-                .format(len(x_test), test_index))
+        x_train = x[groups_serie.isin(train_index)]
+        y_train = y[groups_serie.isin(train_index)]
+        x_test = x[groups_serie.isin(test_indexes[i])]
+        y_test = y[groups_serie.isin(test_indexes[i])]
+        x_train = ppln.discretize(x_train, n_bins)
 
-        for model in params['models_to_run']:
+        print("Train set has {} rows, with group values of {}"
+                .format(len(x_train), train_index))
+        print("Test set has {} rows, with group values of {}"
+                .format(len(x_test), test_indexes))
+
+        ##Creating dummy variables for the train and the test set and 
+        ##keeping only those.
+        x_train = ppln.make_dummies_from_categorical(x_train)
+        x_train = x_train.loc[:,x_train.dtypes == 'uint8']
+        x_discrete = ppln.discretize(x, n_bins)
+        x_test = ppln.make_dummies_from_categorical(x_discrete).loc[x_test.index,]
+        x_test = x_test.loc[:, x_train.columns]
+
+
+        for model, specifications in models_dict.items():
             print()
             print('Fitting {}\n'.format(model))
-            y_prob = run_model(x_train, y_train, x_test,
-                models_funcitons[model], params[model])
-            if model == 'svm':
-                thresholds = params['svm_scores']
-            else:
-                thresholds = params['thresholds']
+            for specification in specifications:
+                y_prob = classif.run_model(x_train, y_train, x_test,
+                					model, specification, seed)
+                print('Built model {} with specification {}'
+                          .format(model, specification))
 
-            for threshold in thresholds:
-                print('Classifying model {} with threshold {}'
-                      .format(model, threshold))
-                metrics = classif.build_all_metrics_for_model(y_prob,
-                                                              y_test,
-                                                              threshold)
-                results = update_dict(results, metrics, model, cross_k,
-                                      threshold)
+                for top_k in top_ks:
+                    metrics = classif.build_all_metrics_for_model(y_prob, y_test,
+                                                                  top_k)
+                    results = update_dict(results, metrics, model, cross_k,
+                                          top_k, specification)
     return results
-        
-
-def run(x, y, semester, params):
-    '''
-    run cross validation and produce output df.
-    Inputs:
-        x: Pandas DataFrame
-        y: Pandas Series
-        semester: Pandas Series
-        pamarams: dict
-    Output:
-        dict
-    '''
-    results = {'model': [],
-               'cross_k': [],
-               'threshold': [],
-               'precision': [],
-               'recall': [],
-               'AUC ROC': []}
-
-    models_funcitons = {
-        'KNN': classif.build_knn,
-        'decision_tree': classif.build_tree,
-        'logistic_reg': classif.build_logistic_reg,
-        'svm': classif.build_svm,
-        'random_forest': classif.build_random_forest,
-        'gradient_boost': classif.build_gradient_boost}
-
-    cross_k = 0
-    semesters = semester.nunique()
-    tscv = TimeSeriesSplit(n_splits=semesters - 1)
-    for train_index, test_index in tscv.split(range(semesters)):
-        cross_k += 1
-        print("Begining cross k: {}".format(cross_k))
-        x_train = x[semester.isin(train_index)]
-        y_train = y[semester.isin(train_index)]
-        x_test = x[semester.isin(test_index)]
-        y_test = y[semester.isin(test_index)]
-        print("Train set has {} rows, with semester values of {}"
-                .format(len(x_train), train_index))
-        print("Test set has {} rows, with semester values of {}"
-                .format(len(x_test), test_index))
-
-        thresholds = params['thresholds']
-        models_to_run = params['models_to_run']
-
-
-        if 'KNN' in models_to_run:
-            model = classif.build_knn(y_train, x_train,
-                        k=params['KNN']['k'],
-                        weights=params['KNN']['weights'],
-                        metric=params['KNN']['metric'])
-            y_prob = classif.predict_proba(model, x_test)
-            for threshold in thresholds:
-                metrics = classif.build_all_metrics_for_model(y_prob, y_test,
-                                                              threshold)
-                results = update_dict(results, metrics, 'KNN', cross_k, threshold)
-
-        if 'DT' in models_to_run:
-            model = classif.build_tree(y_train, x_train,
-                        max_depth=params['decision_tree']['max_depth'],
-                        criterion=params['decision_tree']['criterion'])
-            y_prob = classif.predict_proba(model, x_test)
-            for threshold in thresholds:
-                metrics = classif.build_all_metrics_for_model(y_prob, y_test,
-                                                              threshold)
-                results = update_dict(results, metrics, 'DT', cross_k, threshold)
-
-        if 'LR' in models_to_run:
-            model = classif.build_logistic_reg(y_train, x_train,
-                        C=params['logistic_reg']['C'],
-                        penalty=params['logistic_reg']['penalties'],
-                        fit_intercept=params['logistic_reg']['fit_intercept'],
-                        seed = params['seed'])
-            y_prob = classif.predict_proba(model, x_test)
-            for threshold in thresholds:
-                metrics = classif.build_all_metrics_for_model(y_prob, y_test,
-                                                              threshold)
-                results = update_dict(results, metrics, 'LR', cross_k, threshold)
-
-        if 'SVM' in models_to_run:
-            model = classif.build_svm(y_train, x_train,
-                        C=params['svm']['C'],
-                        seed = params['seed'])
-            confidence_score = model.decision_function(x_test)
-            for threshold in params['svm']['scores']:
-                y_pred =  [1 if x > threshold else 0 for x in confidence_score]
-                metrics = classif.build_evaluation_metrics(y_test, y_pred)
-                results = update_dict(results, metrics, 'SVM', cross_k, threshold)
-
-
-        if 'RF' in models_to_run:
-            model = classif.build_random_forest(y_train, x_train,
-                        max_depth=params['random_forest']['max_depth'],
-                        criterion=params['random_forest']['criterion'],
-                        n_estimators=params['random_forest']['n_estimators'],
-                        seed=params['seed'])
-            y_prob = classif.predict_proba(model, x_test)
-            for threshold in thresholds:
-                metrics = classif.build_all_metrics_for_model(y_prob, y_test,
-                                                              threshold)
-                results = update_dict(results, metrics, 'RF', cross_k, threshold)
-
-
-        if 'GB' in models_to_run:
-            model = classif.build_gradient_boost(
-                        y_train, x_train,
-                        max_depth=params['gradient_boost']['max_depth'],
-                        n_estimators=params['gradient_boost']['n_estimators'],
-                        loss=params['gradient_boost']['loss'],
-                        seed=params['seed'])
-            y_prob = classif.predict_proba(model, x_test)
-            for threshold in thresholds:
-                metrics = classif.build_all_metrics_for_model(y_prob, y_test,
-                                                              threshold)
-                results = update_dict(results, metrics, 'GB', cross_k, threshold)
-
-
-    return results
-
-

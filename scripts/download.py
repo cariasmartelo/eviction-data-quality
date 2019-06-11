@@ -643,6 +643,21 @@ def load_acs(acs_filename):
                          'population_race_other'])
     acs_df[population_types]= acs_df[population_types].apply\
                               (lambda x: x/acs_df['population_total'])
+    def get_mayority(df):
+        max_concentration = df[['population_race_black', 'population_race_white',\
+                                'population_race_latinx', 'population_race_asian']].max()
+        if max_concentration < 0.4:
+            return 'Integrated'
+        else:
+            if df['population_race_black'] == max_concentration:
+                return 'Black'
+            elif df['population_race_white'] == max_concentration:
+                return 'White'
+            elif df['population_race_latinx'] == max_concentration:
+                return 'Latin'
+            elif df['population_race_asian'] == max_concentration:
+                return 'Asian'
+    acs_df['race'] = acs_df.apply(get_mayority, axis=1)
     acs_df = acs_df.drop('Unnamed: 0', axis=1)
     return acs_df
 

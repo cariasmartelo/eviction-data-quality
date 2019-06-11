@@ -3,10 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import mapclassify
 import geopandas as gpd
+import os
 
 FIGURES_FOLDER = "figures/"
 
 def plot_map(eviction_gdf, variable, year, save_fig=False):
+
     '''
     Map by zip code the value of the column indicated in colorcol and the year.
     Inputs:
@@ -27,12 +29,11 @@ def plot_map(eviction_gdf, variable, year, save_fig=False):
     ax.set_title('Tracts of Chicago by {} in {}\n(Tracts without data'
                      ' in grey)'.format(" ".join(variable.split("_")),
                                         year))
+
     plt.axis('off')
     if save_fig:
         fname = "{}map_{}_{}.png".format(FIGURES_FOLDER, variable, year)
         plt.savefig(fname)
-
-    plt.show()
 
 def plot_top_10pct_tracts(gdf, variable, years, save_fig=False):
     '''

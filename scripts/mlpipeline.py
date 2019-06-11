@@ -23,6 +23,10 @@ from sklearn.model_selection import ParameterGrid, train_test_split
 from sklearn.metrics import roc_auc_score 
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from aequitas.group import Group
+from aequitas.bias import Bias
+from aequitas.fairness import Fairness
+from aequitas.plotting import Plot
 
 from helper import *
 
@@ -48,7 +52,7 @@ def create_label(df, year_col, label_col, quantile, prediction_window):
     small_df = df[['year', 'tract', 'eviction_filings_rate']]
     small_df.columns = ['next_year', 'tract', 'eviction_filings_rate_next_year']
     #create a master df, adding eviction filings rate next year to each row
-    master_df = pd.merge(left=df, right=small_df, on=['next_year', 'tract'])
+    master_df = pd.merge(left=df, right=small_df, how='left', on=['next_year', 'tract'])
 
     years = master_df[year_col].unique().tolist()
     for year in years:
@@ -58,7 +62,6 @@ def create_label(df, year_col, label_col, quantile, prediction_window):
         prev_threshold  = get_threshold(master_df.loc[master_df[year_col] == (year), label_col], quantile)
         master_df.loc[master_df['year'] == year, 'label_prev_year'] = np.where(
             master_df.loc[master_df['year'] == year, label_col] >= prev_threshold, 1, 0)
-
 
     return master_df
 
@@ -109,6 +112,7 @@ def discretize_cols(serie, num_bins=3, cats=False):
                 include_lowest=True)
     return rv
 
+
 def convert_to_binary(df, cols_to_transform):
     '''
     This function converts a list of categorical columns into binary
@@ -153,18 +157,20 @@ def process_train_data(rv, cols_to_discretize, num_bins,
     for split_date, data in rv.items():
         train = data[0]
         test = data[1]
+        bias = data[2]
         #process train & test set (fill in nulls, discretize, convert to binary)
         processed_train = process_df(train, cols_to_discretize, 
                                      num_bins, cats, cols_to_binary)
         processed_test = process_df(test, cols_to_discretize, 
                                     num_bins, cats, cols_to_binary)
 
-        processed_rv[split_date] = [processed_train, processed_test]
+        processed_rv[split_date] = [processed_train, processed_test, bias]
     return processed_rv
 
 
 def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv, 
-                              predictors, outcome, thresholds, time_col):
+                              predictors, outcome, thresholds, time_col, 
+                              bias_lst):
     '''
     This function will produce a dataframe to store the performance metrics
     of all the models created.
@@ -200,8 +206,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
     i = 0
     for n in range(1, 2):
         for split_date, data in processed_rv.items():
-            train_set = data[0]
-            test_set = data[1]
+            train_set, test_set, bias_set = data
             #Extract features and labels for train set and test set
             X_train = train_set[predictors]
             X_test = test_set[predictors]
@@ -217,7 +222,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
                 model_name = models_to_run[index]
                 print(model_name)
                 parameter_values = grid[models_to_run[index]]
-                #(line 184, 185) - for each classifier, fit the model based on the train set
+                #for each classifier, fit the model based on the train set
                 for p in ParameterGrid(parameter_values):
                     try:
                         clf.set_params(**p) 
@@ -247,16 +252,39 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
                               [roc_auc_score(y_test, y_pred_probs)]
                         #insert row into the outcome dataframe
                         results_df.loc[len(results_df)] = row
-                        i +=1
+                        # calculate bias
+                        # test_set['score'] = y_pred_probs
                         #Plot the precision recall curves
                         plot_precision_recall_n(y_test, y_pred_probs, clf)
+                        #Plot histogram
+                        plt.hist(y_pred_probs)
+                        plt.title('Histogram of Yscores')
+                        #Plot feature importances
+                        get_feature_importance(model_name, X_train, clf)
+
+                        bias_df = test_set.copy()
+                        bias_df['predicted_score'] = y_pred_probs
+                        bias_df.sort_values('predicted_score', inplace=True)
+                        bias_df['score'] = generate_binary_at_k(bias_df['predicted_score'], 10)
+                        for bias_col in bias_lst:
+                            bias_df[bias_col] = bias_set[bias_col]
+                        bias_df = bias_df[['score', outcome] + bias_lst]
+                        model_id = [i for i in range(len(bias_df))]
+                        # bias_df['entity_id'] = model_id
+                        bias_df.rename({outcome:'label_value'}, axis='columns', inplace=True)
+                        assess_bias(bias_df, 
+                                    metrics = ['fnr','for', 'fdr', 'tpr', 'tnr'], 
+                                    min_group_size = None)
+                        i +=1
+
                     except IndexError as e:
                         print('Error:',e)
                         continue
     return results_df
 
 
-def temporal_validation(df, date_col, prediction_window, start_time, end_time, len_train, gap=0):
+def temporal_validation(df, date_col, prediction_window, start_time, end_time, 
+                        len_train, bias_lst, gap=0):
     '''
     Create a dictionary that maps a key that is the validation date with a list
     of train set and test set that correspond to that validation date.
@@ -269,15 +297,17 @@ def temporal_validation(df, date_col, prediction_window, start_time, end_time, l
         - gap: the number of days between train end date and test start date (not using for now)
         - start_time: string, earliest datetime in the data
         - end_time: string, latest datetime in the data
+        - len_train: the length of the train set
+        - bias_lst: the list of columns we are calculating bias scores on
     Outputs:
         a dictionary that maps the validation date to a list that contains the
-        corresponding train set and test set for that date
+        corresponding train set, test set and bias set for that date
     '''
     start_time_date = datetime.strptime(start_time, '%Y-%m-%d')
     end_time_date = datetime.strptime(end_time, '%Y-%m-%d')
     train_start_time = start_time_date
     rv = {}
-    while train_start_time <= end_time_date - relativedelta(months=len_train) - relativedelta(months=prediction_window):
+    while train_start_time <= end_time_date - relativedelta(months=len_train):
         train_end_time = train_start_time + relativedelta(months=len_train)    
         test_start_time = train_end_time 
         test_end_time = test_start_time + relativedelta(months=prediction_window)
@@ -285,10 +315,12 @@ def temporal_validation(df, date_col, prediction_window, start_time, end_time, l
                            (df[date_col] < train_end_time)]
         test_set = df[(df[date_col] >= test_start_time) &
                            (df[date_col] < test_end_time)]
-        rv[test_start_time] = [train_set, test_set]
-        #once done, move test end time backward
+        bias_set = test_set[bias_lst]
+        rv[test_start_time] = [train_set, test_set, bias_set]
+        #once done, increment len train by 12 months
         len_train += 12
     return rv
+
 
 def get_continuous_variables(df, nunique=30):
     '''
@@ -305,4 +337,52 @@ def get_continuous_variables(df, nunique=30):
     to_discretize = to_discretize.loc[:, to_discretize.nunique() > nunique]
     cols_to_discretize = list(to_discretize.columns)
     return list(cols_to_discretize)
+
+
+def assess_bias(bias_df, metrics =['fnr','for', 'fdr', 'tpr', 'tnr'], min_group_size = None):
+    '''
+    This function creates bar charts for bias metrics given.
+    bias_df = dataframe with ID, label, predicted scores already taking into account the population threshold, and 
+    '''
+    g = Group()
+    xtab, _ = g.get_crosstabs(bias_df)
+    aqp = Plot()
+    p = aqp.plot_group_metric_all(xtab, 
+                                  metrics=metrics, 
+                                  ncols=len(metrics), 
+                                  min_group_size = min_group_size)
+    p.show()
+    return
+
+
+def get_feature_importance(model_name, X_train, clf, n_importances=10):
+    if model_name in ['DT', 'RF', 'GB']:
+        importances = clf.feature_importances_
+    if model_name == 'B':
+        importances = np.mean([tree.feature_importances_ for\
+                               tree in clf.estimators_], axis=0)
+    if model_name == 'LR':
+        importances = abs(clf.coef_[0])
+        importances = (importances / importances.max())
+    indices = np.argsort(importances)[::-1]
+
+
+    print('FEATURE IMPORTANCES')
+    print()
+    f_importances = []
+    important_features = []
+    for f in range(n_importances):
+        if importances[indices[f]] > 0:
+            important_features.append(X_train.columns[indices[f]])
+            f_importances.append(importances[indices[f]])
+            print("%d. Feature %s (%f)" % (f + 1, X_train.columns[indices[f]], importances[indices[f]]))
+    plt.clf()
+    fig, ax = plt.subplots()
+    ys = np.arange(len(important_features))
+    xs = np.array(f_importances)
+    ax.barh(ys, xs)
+    ax.set_yticks(ys) #Replace default x-ticks with xs, then replace xs with labels
+    ax.set_yticklabels(important_features) #Replace default x-ticks with xs, then replace xs with labels
+    ax.invert_yaxis()
+    ax.set_title('Feature Importance')
 

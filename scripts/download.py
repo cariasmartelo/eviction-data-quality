@@ -658,6 +658,14 @@ def load_acs(acs_filename):
             elif df['population_race_asian'] == max_concentration:
                 return 'Asian'
     acs_df['race'] = acs_df.apply(get_mayority, axis=1)
+
+    def get_poor(df):
+        if df['population_poverty_above'] > 0.3:
+            return 'Poor'
+        else:
+          return 'Non-Poor'
+
+    acs_df['poor'] = acs_df.apply(get_poor, axis=1)
     acs_df = acs_df.drop('Unnamed: 0', axis=1)
     return acs_df
 
@@ -712,7 +720,7 @@ def load_tract(tract_shp, keep_geom=False):
     '''
     cols_to_keep = ['tract', 'commarea']
     if keep_geom:
-    	cols_to_keep += ['location']
+        cols_to_keep += ['location']
     tract = load_tract_shapefile(tract_shp)
     tract = tract[cols_to_keep]
     tract['tract'] = tract['tract'].apply(lambda x: '{0:0>6}'.format(x))
@@ -734,7 +742,7 @@ def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df,
         return_df = pd.merge(tract_df, return_df, on = 'tract')
     mean_by_commarea = return_df.groupby(['commarea', 'year']).mean().reset_index()  
     return_df = pd.merge(return_df, mean_by_commarea, on = ['commarea', 'year'],
-    					 suffixes = ('', '_mean_by_commarea'))
+                         suffixes = ('', '_mean_by_commarea'))
     return return_df
     
 

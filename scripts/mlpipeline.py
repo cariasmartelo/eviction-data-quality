@@ -23,6 +23,10 @@ from sklearn.model_selection import ParameterGrid, train_test_split
 from sklearn.metrics import roc_auc_score 
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from aequitas.group import Group
+from aequitas.bias import Bias
+from aequitas.fairness import Fairness
+from aequitas.plotting import Plot
 
 from helper import *
 
@@ -153,13 +157,14 @@ def process_train_data(rv, cols_to_discretize, num_bins,
     for split_date, data in rv.items():
         train = data[0]
         test = data[1]
+        bias = data[2]
         #process train & test set (fill in nulls, discretize, convert to binary)
         processed_train = process_df(train, cols_to_discretize, 
                                      num_bins, cats, cols_to_binary)
         processed_test = process_df(test, cols_to_discretize, 
                                     num_bins, cats, cols_to_binary)
 
-        processed_rv[split_date] = [processed_train, processed_test]
+        processed_rv[split_date] = [processed_train, processed_test, bias]
     return processed_rv
 
 
@@ -248,19 +253,30 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
                         #insert row into the outcome dataframe
                         results_df.loc[len(results_df)] = row
                         # calculate bias
-                        test_set['score'] = y_pred_probs
-                        for bias_col in bias_lst:
-                            test_set[bias_col] = bias_set[bias_col]
-                        bias_df = test_set[[score, outcome] + bias_lst]
-                        model_id = [i for i in range(len(bias_df))]
-                        bias_df['entity_id'] = model_id
-                        bias_df.rename({outcome:label_value}, axis='columns')
-                        assess_bias(bias_df, 
-                                    metrics = ['ppr','pprev','fnr','fpr', 'for'], 
-                                    min_group_size = None)
-                        i +=1
+                        # test_set['score'] = y_pred_probs
                         #Plot the precision recall curves
                         plot_precision_recall_n(y_test, y_pred_probs, clf)
+                        #Plot histogram
+                        plt.hist(y_pred_probs)
+                        plt.title('Histogram of Yscores')
+                        #Plot feature importances
+                        get_feature_importance(model_name, X_train, clf)
+
+                        bias_df = test_set.copy()
+                        bias_df['predicted_score'] = y_pred_probs
+                        bias_df.sort_values('predicted_score', inplace=True)
+                        bias_df['score'] = generate_binary_at_k(bias_df['predicted_score'], 10)
+                        for bias_col in bias_lst:
+                            bias_df[bias_col] = bias_set[bias_col]
+                        bias_df = bias_df[['score', outcome] + bias_lst]
+                        model_id = [i for i in range(len(bias_df))]
+                        # bias_df['entity_id'] = model_id
+                        bias_df.rename({outcome:'label_value'}, axis='columns', inplace=True)
+                        assess_bias(bias_df, 
+                                    metrics = ['fnr','for', 'fdr', 'tpr', 'tnr'], 
+                                    min_group_size = None)
+                        i +=1
+
                     except IndexError as e:
                         print('Error:',e)
                         continue
@@ -291,7 +307,7 @@ def temporal_validation(df, date_col, prediction_window, start_time, end_time,
     end_time_date = datetime.strptime(end_time, '%Y-%m-%d')
     train_start_time = start_time_date
     rv = {}
-    while train_start_time <= end_time_date - relativedelta(months=prediction_window):
+    while train_start_time <= end_time_date - relativedelta(months=len_train):
         train_end_time = train_start_time + relativedelta(months=len_train)    
         test_start_time = train_end_time 
         test_end_time = test_start_time + relativedelta(months=prediction_window)
@@ -323,7 +339,7 @@ def get_continuous_variables(df, nunique=30):
     return list(cols_to_discretize)
 
 
-def assess_bias(bias_df, metrics = ['fnr', 'for'], min_group_size = None):
+def assess_bias(bias_df, metrics =['fnr','for', 'fdr', 'tpr', 'tnr'], min_group_size = None):
     '''
     This function creates bar charts for bias metrics given.
     bias_df = dataframe with ID, label, predicted scores already taking into account the population threshold, and 
@@ -337,4 +353,36 @@ def assess_bias(bias_df, metrics = ['fnr', 'for'], min_group_size = None):
                                   min_group_size = min_group_size)
     p.show()
     return
+
+
+def get_feature_importance(model_name, X_train, clf, n_importances=10):
+    if model_name in ['DT', 'RF', 'GB']:
+        importances = clf.feature_importances_
+    if model_name == 'B':
+        importances = np.mean([tree.feature_importances_ for\
+                               tree in clf.estimators_], axis=0)
+    if model_name == 'LR':
+        importances = abs(clf.coef_[0])
+        importances = (importances / importances.max())
+    indices = np.argsort(importances)[::-1]
+
+
+    print('FEATURE IMPORTANCES')
+    print()
+    f_importances = []
+    important_features = []
+    for f in range(n_importances):
+        if importances[indices[f]] > 0:
+            important_features.append(X_train.columns[indices[f]])
+            f_importances.append(importances[indices[f]])
+            print("%d. Feature %s (%f)" % (f + 1, X_train.columns[indices[f]], importances[indices[f]]))
+    plt.clf()
+    fig, ax = plt.subplots()
+    ys = np.arange(len(important_features))
+    xs = np.array(f_importances)
+    ax.barh(ys, xs)
+    ax.set_yticks(ys) #Replace default x-ticks with xs, then replace xs with labels
+    ax.set_yticklabels(important_features) #Replace default x-ticks with xs, then replace xs with labels
+    ax.invert_yaxis()
+    ax.set_title('Feature Importance')
 

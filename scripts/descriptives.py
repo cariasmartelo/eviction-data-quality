@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import mapclassify
 import geopandas as gpd
 
+FIGURES_FOLDER = "figures/"
 
-
-def plot_map(eviction_gdf, variable, years):
+def plot_map(eviction_gdf, variable, year, save_fig=False):
     '''
     Map by zip code the value of the column indicated in colorcol and the year.
     Inputs:
@@ -16,80 +16,25 @@ def plot_map(eviction_gdf, variable, years):
     Output:
         Map
     '''
-    if isinstance(years, int):
-        year = years
-        fig, ax = plt.subplots(figsize=(8, 12))
-        eviction_gdf.plot(color="grey", ax=ax, edgecolor="black")
-        eviction_gdf.loc[(eviction_gdf['year'] == year) &\
-                        (eviction_gdf[variable].notna())].plot(ax=ax, 
-                                                               column=variable,
-                                                               cmap='viridis',
-                                                               scheme='quantiles',
-                                                               legend=True)
-
-        ax.set_title('Tracts of Chicago by {} in {}\n(Tracts without data'
+    fig, ax = plt.subplots(figsize=(8, 12))
+    eviction_gdf.plot(color="grey", ax=ax, edgecolor="black")
+    eviction_gdf.loc[(eviction_gdf['year'] == year) &\
+                     (eviction_gdf[variable].notna())].plot(ax=ax,
+                                                            column=variable,
+                                                            cmap='viridis_r',
+                                                            scheme='quantiles',
+                                                            legend=True)
+    ax.set_title('Tracts of Chicago by {} in {}\n(Tracts without data'
                      ' in grey)'.format(" ".join(variable.split("_")),
                                         year))
-    else:
-        fig, ax = plt.subplots(nrows = len(years), figsize=(8, 12))
-        for i, year in enumerate(years):
-            eviction_gdf.plot(color="grey", ax=ax[i], edgecolor="black")
-            eviction_gdf.loc[(eviction_gdf['year'] == year) &\
-                            (eviction_gdf[variable].notna())].plot(ax=ax[i], 
-                                                                   column=variable,
-                                                                   cmap='viridis',
-                                                                   scheme='quantiles',
-                                                                   legend=True)
-
-            ax[i].set_title('Tracts of Chicago by {} in {}\n(Tracts without data'
-                         ' in grey)'.format(" ".join(variable.split("_")),
-                                            year))
     plt.axis('off')
+    if save_fig:
+        fname = "{}map_{}_{}.png".format(FIGURES_FOLDER, variable, year)
+        plt.savefig(fname)
+
     plt.show()
 
-
-def plot_map_change(eviction_gdf, variable, years):
-    '''
-    Map by zip code the value of the column indicated in colorcol and the year.
-    Inputs:
-        eviction_gdf: GeoDataFrame
-        variable: Str
-        year: int or list
-    Output:
-        Map
-    '''
-    if isinstance(years, int):
-        year = years
-        fig, ax = plt.subplots(figsize=(8, 12))
-        eviction_gdf.plot(color="grey", ax=ax, edgecolor="black")
-        eviction_gdf.loc[(eviction_gdf['year'] == year) &\
-                        (eviction_gdf[variable].notna())].plot(ax=ax, 
-                                                               column=variable,
-                                                               cmap='viridis',
-                                                               scheme='quantiles',
-                                                               legend=True)
-
-        ax.set_title('Tracts of Chicago by {} in {}\n(Tracts without data'
-                     ' in grey)'.format(" ".join(variable.split("_")),
-                                        year))
-    else:
-        fig, ax = plt.subplots(nrows = len(years), figsize=(8, 12))
-        for i, year in enumerate(years):
-            eviction_gdf.plot(color="grey", ax=ax[i], edgecolor="black")
-            eviction_gdf.loc[(eviction_gdf['year'] == year) &\
-                            (eviction_gdf[variable].notna())].plot(ax=ax[i], 
-                                                                   column=variable,
-                                                                   cmap='viridis',
-                                                                   scheme='quantiles',
-                                                                   legend=True)
-
-            ax[i].set_title('Tracts of Chicago by {} in {}\n(Tracts without data'
-                         ' in grey)'.format(" ".join(variable.split("_")),
-                                            year))
-    plt.axis('off')
-    plt.show()
-
-def plot_top_10pct_tracts(gdf, variable, years):
+def plot_top_10pct_tracts(gdf, variable, years, save_fig=False):
     '''
     Plots the tracts in Chicago that were in the top 10% of a given variable,
     for a given list of years.
@@ -102,18 +47,21 @@ def plot_top_10pct_tracts(gdf, variable, years):
         years = list(years)
 
     for year in years:
-        gdf_plot = gdf[(gdf.year == year) & gdf[variable].notna()]
+        gdf_plt = gdf[(gdf.year == year) & gdf[variable].notna()]
 
         fig, ax = plt.subplots(figsize=(6, 10))
         ax.set_aspect('equal')
-        gdf_plot.plot(ax=ax, color='white', edgecolor='grey')
-        gdf_plot[gdf_plot[variable].rank(pct=True) > .90].plot(ax=ax)
-        ax.set_title('Tracts of Chicago that are in the top 10% percent of {} in {}'\
+        gdf_plt.plot(ax=ax, color='white', edgecolor='grey')
+        gdf_plt[gdf_plt[variable].rank(pct=True) > .90].plot(ax=ax, color="m")
+        ax.set_title('Tracts of Chicago that are in the top 10 percent\n of {} in {}'\
                      .format(" ".join(variable.split("_")), year))
         plt.axis('off')
+        if save_fig:
+            fname = "{}map_top10_{}_{}.png".format(FIGURES_FOLDER, variable, year)
+            plt.savefig(fname)
         plt.show();
 
-def plot_top_10pct_tracts_ktimes(gdf, variable, k, get_tracts=False):
+def plot_top_10pct_tracts_ktimes(gdf, variable, k, get_tracts=False, save_fig=False):
     '''
     '''
     temp_df = gdf.assign(perc=gdf.groupby("year")[variable].rank(pct=True))
@@ -123,18 +71,17 @@ def plot_top_10pct_tracts_ktimes(gdf, variable, k, get_tracts=False):
     top_k_tracts = counts[counts.top_10 > k]
     tracts = list(top_k_tracts.index)
 
-
     fig, ax = plt.subplots(figsize=(6, 10))
     ax.set_aspect('equal')
     gdf.plot(ax=ax, color='white', edgecolor='grey')
     gdf[(gdf.tract.isin(tracts)) & gdf[variable].notna()].plot(ax=ax)
-    ax.set_title('Tracts of Chicago that are in the top 10% percent of {} at least {} times in the period 2010-2017'\
+    ax.set_title('Tracts of Chicago that are in the top 10 percent of\n{} at least {}times in the period 2010-2017'\
                  .format(" ".join(variable.split("_")), k))
     plt.axis('off')
+    if save_fig:
+        fname = "{}map_top10_{}times_{}.png".format(FIGURES_FOLDER, k, variable)
+        plt.savefig(fname)
     plt.show();
 
     if get_tracts:
         return tracts
-
-
-

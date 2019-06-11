@@ -48,7 +48,7 @@ def create_label(df, year_col, label_col, quantile, prediction_window):
     small_df = df[['year', 'tract', 'eviction_filings_rate']]
     small_df.columns = ['next_year', 'tract', 'eviction_filings_rate_next_year']
     #create a master df, adding eviction filings rate next year to each row
-    master_df = pd.merge(left=df, right=small_df, on=['next_year', 'tract'])
+    master_df = pd.merge(left=df, right=small_df, how='left', on=['next_year', 'tract'])
 
     years = master_df[year_col].unique().tolist()
     for year in years:
@@ -58,7 +58,6 @@ def create_label(df, year_col, label_col, quantile, prediction_window):
         prev_threshold  = get_threshold(master_df.loc[master_df[year_col] == (year), label_col], quantile)
         master_df.loc[master_df['year'] == year, 'label_prev_year'] = np.where(
             master_df.loc[master_df['year'] == year, label_col] >= prev_threshold, 1, 0)
-
 
     return master_df
 
@@ -108,6 +107,7 @@ def discretize_cols(serie, num_bins=3, cats=False):
                 right=True, 
                 include_lowest=True)
     return rv
+
 
 def convert_to_binary(df, cols_to_transform):
     '''

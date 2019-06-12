@@ -1,9 +1,9 @@
 # eviction-data-quality
-Predict tracts that will be in the highest 10% in terms of eviction rate in Chicago to inform legal outreach activities by Chica.
+Effort to improve the legal outreach activities of Non Profit organization __ to reduce eviction in Chicago. We use Machine Learning to build a model that predicts the tracts in Chicago that will be among the top 10% tracts with the highest eviction rate. With this prediction, we hope to improve the efficiency of the work made by ____, because they will be able to destinate their resources to the tracts mots it need. To do this, we use data from the Chicago Evictions Lawyers project, and we complement it with data from the ACS and the CHicago Open Data Portal.
 
 
 ## Requirements
-
+- Python 3.6
 - numpy 1.15.4
 - pandas 0.24.2
 - mapclassify 2.0.1
@@ -17,7 +17,7 @@ Predict tracts that will be in the highest 10% in terms of eviction rate in Chic
 - sklearn 0.20.3 
 - aequitas 0.38.0
 
-## Repo organization
+## Repository organization
 
 - scripts\
 Contains the scripts used to download and process the data, to run the machine learning pipeline, and to produce the descriptive statistics. It also contains Jupyter notebooks where the scripts are used.
@@ -47,7 +47,12 @@ Contains figures created by the graph.ipynb notebook.
 - Reducing_evictions_Chicago.pdf
 Contains report of the project
 
+## Running
+- To download the data, clone the repository and run --sh get_files.sh-- inside the inputs repository.
+- To run prediction of the Census tracts that in 2019 will be abong the highest 10%, run --run_classification.py--
 
-
-This research uses data from The Eviction Lab at Princeton University, a project directed by Matthew Desmond and designed by Ashley Gromis, Lavar Edmonds, James Hendrickson, Katie Krywokulski, Lillian Leung, and Adam Porton. The Eviction Lab is funded by the JPB, Gates, and Ford Foundations as well as the Chan Zuckerberg Initiative. More information is found at evictionlab.org.
+## Contributors
+Angelica Valdiviezo
+Camilo Arias
+Chi Nguyen
 

@@ -259,6 +259,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
                         #Plot histogram
                         plt.hist(y_pred_probs)
                         plt.title('Histogram of Yscores')
+                        plt.show()
                         #Plot feature importances
                         get_feature_importance(model_name, X_train, clf)
 

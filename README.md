@@ -1,6 +1,7 @@
 # eviction-data-quality
-Effort to improve the legal outreach activities of Non Profit organization __ to reduce eviction in Chicago. We use Machine Learning to build a model that predicts the tracts in Chicago that will be among the top 10% tracts with the highest eviction rate. With this prediction, we hope to improve the efficiency of the work made by ____, because they will be able to destinate their resources to the tracts mots it need. To do this, we use data from the Chicago Evictions Data Portal from the Lawyers’ Committee for Better Housing, and we complement it with data from the ACS and the CHicago Open Data Portal.
+Effort to improve the legal aid and outreach activities of an hypothetical regional non-profit that works in Chicago to promote pro-bono legal aid to represent tenants in eviction cases. The ultimate goal is to reduce eviction in Chicago.
 
+We use Machine Learning to build a model that predicts the tracts in Chicago that will be among the top 10% tracts with the highest eviction rate one year after the time of the prediction. With this prediction, we hope to better target communities that need improve the efficiency of the work made by our client -the hypothetical organization- because they will be able to focus their resources to the tracts that need them the most. To do this, we use data from the Chicago Evictions Data Portal from the Lawyers’ Committee for Better Housing, and we complement it with data from the ACS and the Chicago Open Data Portal.
 
 ## Requirements
 - Python 3.6
@@ -19,33 +20,21 @@ Effort to improve the legal outreach activities of Non Profit organization __ to
 
 ## Repository organization
 
-- scripts\
+##### scripts\
 Contains the scripts used to download and process the data, to run the machine learning pipeline, and to produce the descriptive statistics. It also contains Jupyter notebooks where the scripts are used.
-	- mlpipeline.py: Contains the pipeline to split the train and test data, to fit the classifiers, to evaluate the models, and perform the biass and fairness analysis using Aequitas.
+  - mlpipeline.py: Contains the pipeline to split the train and test data, to fit the classifiers, to evaluate the models, and perform the biass and fairness analysis using Aequitas.
+  - helper.py: Is a helper script used by mlpipeline to run the classifiers.
+  - download.py: Contains the functions to download the source data from the Evictions Lawyers, from the ACS and the Chicago Open Data Portal and save it in csv files. It also has the functions to load that data and to merge it all into a DataFrame aggregated by tract and year.
+  - describe.py: Contains the functions to produce visualizations of the data.
+  - run_classification.ipynb: Jupyter notebook where the data is loaded, the classifiers are built and the resultd are saved in results.csv
+  - model_analysis.ipynb: Kupyuter notebook where we analyze the classification results, we select the best classifier and we fit the best model to the whole dataset.
+  - graphs.ipynb: Jupyter notebook where we use the desvriptives.py script to produce visualizations.
 
-	-helper.py: Is a help[er script used by mlpipeline to run the classifiers.
-
-	-download.py: Contains the functions to download the source data from the Evictions Lawyers, from the ACS and the Chicago Open Data Portal and save it in csv files. It also has the functions to load that data and to merge it all into a DataFrame aggregated by tract and year.
-
-	-describe.py: Contains the functions to produce visualizations of the data.
-
-	- run_classification.ipynb: Jupyter notebook where the data is loaded, the classifiers are built and the resultd are saved in results.csv
-
-	- model_analysis.ipynb: Kupyuter notebook where we analyze the classification results, we select the best classifier and we fit the best model to the whole dataset.
-
-	- graphs.ipynb: Jupyter notebook where we use the desvriptives.py script to produce visualizations.
-
-- Inputs\
+##### inputs\
 Contains the eviction data from the eviction lawyers in csv format and the sh script that calls download.py to download the rest of the data. When get_data.sh is run, the original inputs are created inside the ch_opdat and acs folders, and the secondary inputs that are aggregated by tract and year are created directly in the folder as csv files.
-
-- results\
-Contains the csv with the results of the classifiers.
-
-- figures\
-Contains figures created by the graph.ipynb notebook.
-
-- Reducing_evictions_Chicago.pdf
-Contains report of the project
+  - results\ : Contains the csv with the results of the classifiers.
+  - figures\ : Contains figures created by the graph.ipynb notebook.
+  - Reducing_evictions_Chicago.pdf: Contains report of the project
 
 ## Running
 - To download the data, clone the repository and run --sh get_files.sh-- inside the inputs repository.
@@ -55,4 +44,3 @@ Contains report of the project
 Camilo Arias
 Chi Nguyen
 Angelica Valdiviezo
-

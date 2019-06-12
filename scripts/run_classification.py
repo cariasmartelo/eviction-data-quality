@@ -45,7 +45,7 @@ acs = download.load_acs('../inputs/acs_year_tract.csv')
 education = download.load_education('../inputs/educ_year_tract.csv')
 tracts = download.load_tract('../inputs/ch_opdat/tracts.csv')
 
-eviction_df = mlpipeline.create_label(eviction_df, 'year', 'eviction_filings_rate', 1 - params['top_x_percent'],
+eviction_df = mlpipeline.create_label(eviction, 'year', 'eviction_filings_rate', 1 - params['top_x_percent'],
                                       params['prediction_window'])
 eviction_df = eviction_df.drop(['eviction_filings_rate_next_year', 'next_year'], axis = 1)
 
@@ -85,7 +85,7 @@ clf_lr = LogisticRegression(C= 10,
                         verbose= 0,
                         warm_start= False)
 clf_lr.fit(x_train, y_train)
-y_pred_probs = clf.predict_proba(x_test)
+y_pred_probs = clf_lr.predict_proba(x_test)
 test_set['predicted_lr_score'] = y_pred_probs[:,1]
 test_set.sort_values('predicted_lr_score', inplace=True, ascending=False)
 test_set['prediction_lr'] = helper.generate_binary_at_k(test_set['predicted_lr_score'], 10)
@@ -109,7 +109,7 @@ clf_rf = RandomForestClassifier(bootstrap=True,
                              warm_start=False)
 
 clf_rf.fit(x_train, y_train)
-y_pred_probs = clf.predict_proba(x_test)
+y_pred_probs = clf_rf.predict_proba(x_test)
 test_set['predicted_rf_score'] = y_pred_probs[:,1]
 test_set.sort_values('predicted_rf_score', inplace=True, ascending=False)
 test_set['prediction_rf'] = helper.generate_binary_at_k(test_set['predicted_rf_score'], 10)

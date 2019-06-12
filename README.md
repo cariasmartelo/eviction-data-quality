@@ -1,5 +1,5 @@
 # eviction-data-quality
-Effort to improve the legal outreach activities of Non Profit organization __ to reduce eviction in Chicago. We use Machine Learning to build a model that predicts the tracts in Chicago that will be among the top 10% tracts with the highest eviction rate. With this prediction, we hope to improve the efficiency of the work made by ____, because they will be able to destinate their resources to the tracts mots it need. To do this, we use data from the Chicago Evictions Data Portal from the Lawyers’ Committee for Better Housing, and we complement it with data from the ACS and the CHicago Open Data Portal.
+Effort to improve the legal outreach activities of Non Profit organization focused in reducing eviction in Chicago. We use Machine Learning to build a model that predicts the tracts in Chicago that will be among the top 10% tracts with the highest eviction rate. With this prediction, we hope to improve the efficiency of the legar work, because they will be able to destinate their resources to the tracts mots it need. To do this, we use data from the Chicago Evictions Data Portal from the Lawyers’ Committee for Better Housing, and we complement it with data from the ACS and the CHicago Open Data Portal.
 
 
 ## Requirements
@@ -23,11 +23,11 @@ Effort to improve the legal outreach activities of Non Profit organization __ to
 Contains the scripts used to download and process the data, to run the machine learning pipeline, and to produce the descriptive statistics. It also contains Jupyter notebooks where the scripts are used.
 	- mlpipeline.py: Contains the pipeline to split the train and test data, to fit the classifiers, to evaluate the models, and perform the biass and fairness analysis using Aequitas.
 
-	-helper.py: Is a help[er script used by mlpipeline to run the classifiers.
+	- helper.py: Is a help[er script used by mlpipeline to run the classifiers.
 
-	-download.py: Contains the functions to download the source data from the Evictions Lawyers, from the ACS and the Chicago Open Data Portal and save it in csv files. It also has the functions to load that data and to merge it all into a DataFrame aggregated by tract and year.
+	- download.py: Contains the functions to download the source data from the Evictions Lawyers, from the ACS and the Chicago Open Data Portal and save it in csv files. It also has the functions to load that data and to merge it all into a DataFrame aggregated by tract and year.
 
-	-describe.py: Contains the functions to produce visualizations of the data.
+	- describe.py: Contains the functions to produce visualizations of the data.
 
 	- run_classification.ipynb: Jupyter notebook where the data is loaded, the classifiers are built and the resultd are saved in results.csv
 

@@ -55,6 +55,10 @@ Contains figures created by the graph.ipynb notebook.
 - Reducing_evictions_Chicago.pdf
 Contains report of the project
 
+- Additional Materials.xls: Additional materials
+
+- Final_Report_Predictiong_Evictions_Chicago.pdf: Final Report
+
 ## Running
 - To download the data, clone the repository and run --sh get_files.sh-- inside the inputs repository.
 - To run prediction of the Census tracts that in 2019 will be abong the highest 10%, run --python3 run_classification.py-- in scripts.

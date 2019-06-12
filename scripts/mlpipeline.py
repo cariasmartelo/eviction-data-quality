@@ -27,6 +27,14 @@ from aequitas.group import Group
 from aequitas.bias import Bias
 from aequitas.fairness import Fairness
 from aequitas.plotting import Plot
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import precision_recall_curve
+from sklearn.linear_model import LogisticRegression
 
 from helper import *
 
@@ -364,7 +372,7 @@ def get_feature_importance(model_name, X_train, clf, n_importances=10):
         importances = np.mean([tree.feature_importances_ for\
                                tree in clf.estimators_], axis=0)
     if model_name == 'LR':
-        importances = abs(clf.coef_[0])
+        importances = abs(clf.coef_[0]) * np.array(np.std(X_train, 0))
         importances = (importances / importances.max())
     indices = np.argsort(importances)[::-1]
 
@@ -387,4 +395,32 @@ def get_feature_importance(model_name, X_train, clf, n_importances=10):
     ax.set_yticklabels(important_features) #Replace default x-ticks with xs, then replace xs with labels
     ax.invert_yaxis()
     ax.set_title('Feature Importance')
+
+
+def run_model(x_train, y_train, x_test, classif_model, model_params):
+    '''
+    Create classification model and return y_score. The function takes model,
+    which is a function, and a dict with the parameters of that model.
+    Inputs:
+        x_train: Pandas Series
+        y_train: Pandas Series
+        x_test: Pandas Series
+        classif_model: function
+        model_params: dict
+    '''
+
+    clfs = {'RF': RandomForestClassifier(n_estimators=50, n_jobs=-1),
+            'B': BaggingClassifier(),
+            'LR': LogisticRegression,
+            'SVM': svm.LinearSVC(),
+            'GB': GradientBoostingClassifier(learning_rate=0.05, subsample=0.5, max_depth=6, n_estimators=10),
+            'DT': DecisionTreeClassifier(),
+            'KNN': KNeighborsClassifier(n_neighbors=3) 
+            }
+    build_function = clfs[classif_model]
+    clf = build_function(**model_params)
+    clf.fit(x_train, y_train)
+    y_score = clf.predict_proba(x_test)
+
+    return y_score[:,1]
 

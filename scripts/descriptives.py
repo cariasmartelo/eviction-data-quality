@@ -5,7 +5,7 @@ import mapclassify
 import geopandas as gpd
 import os
 
-FIGURES_FOLDER = "figures/"
+FIGURES_FOLDER = "../figures/"
 
 def plot_map(eviction_gdf, variable, year, save_fig=False):
 
@@ -76,7 +76,7 @@ def plot_top_10pct_tracts_ktimes(gdf, variable, k, get_tracts=False, save_fig=Fa
     ax.set_aspect('equal')
     gdf.plot(ax=ax, color='white', edgecolor='grey')
     gdf[(gdf.tract.isin(tracts)) & gdf[variable].notna()].plot(ax=ax)
-    ax.set_title('Tracts of Chicago that are in the top 10 percent of\n{} at least {}times in the period 2010-2017'\
+    ax.set_title('Tracts of Chicago that are in the top 10 percent of\n{} at least {} times in the period 2010-2017'\
                  .format(" ".join(variable.split("_")), k))
     plt.axis('off')
     if save_fig:

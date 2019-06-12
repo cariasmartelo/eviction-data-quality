@@ -748,8 +748,18 @@ def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df,
 
 
 if __name__ == "__main__":
-    #download_eviction_data()
-    #download_crime_data()
-    #download_building_violation_data()
-    #download_census_data()
+    download_eviction_data()
+    download_crime_data()
+    download_building_violation_data()
+    download_census_data()
+    tract_data = load_tract('ch_opdat/tracts.csv')
+    crime_data = load_crime_data_spread('ch_opdat/crime.csv')
+    bv_data = load_building_violations_spread('ch_opdat/building_viol.csv')
+    aggregate_crime_data(crime_data, tract_data, save=True)
+    aggregate_building_data(bv_df, tract_data, save=True)
+    acs_data = load_acs_data('acs/census_data_tract.csv')
+    impute_acs_data(acs_data, acs=True, save=True, filepath=None, year_dict=None)
+    educ_data = load_acs_data('acs/censu_data_tract.csv')
+    impute_acs_data(educ_data, acs=False, save=True, filepath=None, year_dict=None)
+
     pass

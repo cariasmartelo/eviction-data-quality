@@ -54,6 +54,10 @@ def get_threshold(num_array, quantile):
 
 def create_label(df, year_col, label_col, quantile, prediction_window):
     '''
+    This function will be applied to the eviction dataset
+    It will assign a label of 1 to a tract-year record if
+    this same tract will be among the top 10% highest eviction
+    rate tracts in the next year.
     '''
     df = df.iloc[:,:]
     df['next_year'] = df['year'] + 1 
@@ -61,7 +65,6 @@ def create_label(df, year_col, label_col, quantile, prediction_window):
     small_df.columns = ['next_year', 'tract', 'eviction_filings_rate_next_year']
     #create a master df, adding eviction filings rate next year to each row
     master_df = pd.merge(left=df, right=small_df, how='left', on=['next_year', 'tract'])
-
     years = master_df[year_col].unique().tolist()
     for year in years:
         threshold = get_threshold(master_df.loc[master_df[year_col] == (year + 1), label_col], quantile)
@@ -70,7 +73,6 @@ def create_label(df, year_col, label_col, quantile, prediction_window):
         prev_threshold  = get_threshold(master_df.loc[master_df[year_col] == (year), label_col], quantile)
         master_df.loc[master_df['year'] == year, 'label_prev_year'] = np.where(
             master_df.loc[master_df['year'] == year, label_col] >= prev_threshold, 1, 0)
-
     return master_df
 
 
@@ -86,6 +88,7 @@ def find_nuls(df):
 
 def fill_null_cols(df, null_col_list):
     '''
+    This function will return the columns that contain null values
     '''
     for col in null_col_list:
         try:
@@ -95,24 +98,15 @@ def fill_null_cols(df, null_col_list):
             continue
 
 
-# def discretize_cols(df, old_col, num_bins=3, cats=False):
 def discretize_cols(serie, num_bins=3, cats=False):
     '''
     This function converts a list of continous columns into categorical
     Inputs:
-        - dataframe (pandas dataframe)
-        - old col (string): label of column to discretize
+        - serie
         - num_bins (int): number of bins to discretize into
         - cats: a list of categories to organize the continuous values into
     Returns a pandas dataframe
     '''
-    # new_col = old_col + '_group'
-    # df[new_col] = pd.cut(df[old_col], 
-    #                      bins=num_bins, 
-    #                      labels=cats, 
-    #                      right=True, 
-    #                      include_lowest=True)
-    # return df
     rv = pd.cut(serie, 
                 bins=num_bins, 
                 labels=cats, 
@@ -146,8 +140,6 @@ def process_df(df, cols_to_discretize, num_bins, cats, cols_to_binary):
     a dataframe
     '''
     fill_null_cols(df, find_nuls(df))
-    # for col in cols_to_discretize:
-    #     processed_df = discretize_cols(df, col, num_bins, cats)
     discrete = df[cols_to_discretize].apply(discretize_cols, args = (num_bins, cats))
     discrete = discrete.add_suffix('_group')
     processed_df = pd.concat([df, discrete], axis=1)
@@ -171,7 +163,6 @@ def process_train_data(rv, cols_to_discretize, num_bins,
                                      num_bins, cats, cols_to_binary)
         processed_test = process_df(test, cols_to_discretize, 
                                     num_bins, cats, cols_to_binary)
-
         processed_rv[split_date] = [processed_train, processed_test, bias]
     return processed_rv
 
@@ -188,14 +179,15 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
         - grid: a dictionary that documents all the variation of parameters
         for each classifier
         - processed_rv: a dictionary that maps a split date to a list that
-        contains the processed train set and processed test set for that
-        particular split date
+        contains the processed train set, processed test set and bias set 
+        for that particular split date
         - predictors: the list of features
         - outcome: the label column
         - thresholds: the thresholds of interest that we will use to build
         performance metrics
         - time_col: the date columns (will be used to check start and end
         date of train and test set)
+        - bias_lst: the list of columns to calculate bias metrics
     Returns:
         - a dataframe of results
     '''
@@ -260,17 +252,15 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
                               [roc_auc_score(y_test, y_pred_probs)]
                         #insert row into the outcome dataframe
                         results_df.loc[len(results_df)] = row
-                        # calculate bias
-                        # test_set['score'] = y_pred_probs
                         #Plot the precision recall curves
                         plot_precision_recall_n(y_test, y_pred_probs, clf)
-                        #Plot histogram
+                        #Plot histogram of predicted scores
                         plt.hist(y_pred_probs)
                         plt.title('Histogram of Yscores')
                         plt.show()
                         #Plot feature importances
                         get_feature_importance(model_name, X_train, clf)
-
+                        #Plot bias metrics
                         bias_df = test_set.copy()
                         bias_df['predicted_score'] = y_pred_probs
                         bias_df.sort_values(['predicted_score', outcome], inplace=True, ascending=False)
@@ -279,9 +269,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
                             bias_df[bias_col] = bias_set[bias_col]
                         bias_df = bias_df[['score', outcome] + bias_lst]
                         model_id = [i for i in range(len(bias_df))]
-                        # bias_df['entity_id'] = model_id
                         bias_df.rename({outcome:'label_value'}, axis='columns', inplace=True)
-                        print(bias_df.groupby('race').sum())
                         assess_bias(bias_df, 
                                     metrics = ['fnr','for', 'fdr', 'tpr', 'tnr'], 
                                     min_group_size = None)
@@ -352,7 +340,7 @@ def get_continuous_variables(df, nunique=30):
 def assess_bias(bias_df, metrics =['fnr','for', 'fdr', 'tpr', 'tnr'], min_group_size = None):
     '''
     This function creates bar charts for bias metrics given.
-    bias_df = dataframe with ID, label, predicted scores already taking into account the population threshold, and 
+    bias_df is preprocessed
     '''
     g = Group()
     xtab, _ = g.get_crosstabs(bias_df)
@@ -366,6 +354,9 @@ def assess_bias(bias_df, metrics =['fnr','for', 'fdr', 'tpr', 'tnr'], min_group_
 
 
 def get_feature_importance(model_name, X_train, clf, n_importances=10):
+    '''
+    This function returns the feature importances list
+    '''
     if model_name in ['DT', 'RF', 'GB']:
         importances = clf.feature_importances_
     if model_name == 'B':
@@ -421,6 +412,5 @@ def run_model(x_train, y_train, x_test, classif_model, model_params):
     clf = build_function(**model_params)
     clf.fit(x_train, y_train)
     y_score = clf.predict_proba(x_test)
-
     return y_score[:,1]
 

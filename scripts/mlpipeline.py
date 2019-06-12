@@ -198,7 +198,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
             metric_cols.append(metric + str(thres)) #cycling through all metrics and create column labels
     COLS = ['model_type', 'clf', 'parameters', 'split_date'] + \
            ['min_year_in_train', 'max_year_in_train', 'min_year_in_test', 'max_year_in_test'] +\
-           ['baseline'] + \
+           ['random_baseline'] + \
            metric_cols + \
            ['auc-roc']
     

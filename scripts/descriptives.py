@@ -86,3 +86,23 @@ def plot_top_10pct_tracts_ktimes(gdf, variable, k, get_tracts=False, save_fig=Fa
 
     if get_tracts:
         return tracts
+
+def map_predictions(gdf, pred_result, model, save_fig=False, year_pred='2018'):
+    '''
+    '''
+    fig, ax = plt.subplots(figsize=(6, 10))
+    ax.set_aspect('equal')
+    gdf.plot(ax=ax, color='white', edgecolor="grey")
+    gdf[gdf[pred_result] == 1.0].plot(ax=ax, color="firebrick")
+    plt.axis('off')
+    ax.set_title('Predicted tracts of Chicago to be in the top 10 percent of\n\
+                  evictions filings rate in {}'.format(year_pred))
+
+    if save_fig:
+        fname = "{}map_{}_predictions_{}.png".format(FIGURES_FOLDER, model, year_pred)
+        plt.savefig(fname)
+    plt.show();
+    plt.show();
+
+
+

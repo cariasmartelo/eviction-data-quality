@@ -118,37 +118,6 @@ ACS_TABLES_KEYS = {
                     }
                 }
 
-######### EVICTION LAB ############
-
-# TODO maybe delete
-# def download_eviction_data(state='IL', geo_level='all', filepath=None, download_dict=False):
-#     '''
-#     Download data using Amazon S3 API
-#     Inputs:
-#         U.S. state: State 2 letter code (str)
-#         geo_level: 'all', cities', 'counties', 'states' or 'tracts' (str)
-#         filepath: filepath: Path to store data (str). Default input folder.
-#         download_dict: True to download data dictionary.
-#     '''
-#     if not filepath:
-#         filepath = os.path.join(os.getcwd(), 'eviction', '')
-#     if not os.path.exists(filepath):
-#         os.mkdir(filepath)
-#     files = [geo_level + '.csv']
-#     if geo_level != 'all':
-#         files.append(geo_level + '.geojson')
-#     s3 = boto3.client('s3')
-#     for file in files:
-#         s3.download_file('eviction-lab-data-downloads', os.path.join(state, file),
-#                          os.path.join(filepath, file))
-#         print("Downloaded {} of {} in {}"
-#               .format(file, state, filepath))
-#     if download_dict:
-#         s3.download_file('eviction-lab-data-downloads', 'DATA_DICTIONARY.txt',
-#                          os.path.join(filepath, 'DATA_DICTIONARY.txt'))
-#         print("Downloaded {} in {}".format('DATA_DICTIONARY.txt', filepath))
-
-
 ######### DOWNLOADS ############
 
 def download_chiopdat_data(api_endpoint, year_from=None, year_to=None,
@@ -748,7 +717,6 @@ def join_bases(eviction_df, acs_df, education_df, crime_df, building_viol_df,
 
 
 if __name__ == "__main__":
-    download_eviction_data()
     download_crime_data()
     download_building_violation_data()
     download_census_data()
@@ -759,7 +727,7 @@ if __name__ == "__main__":
     aggregate_building_data(bv_df, tract_data, save=True)
     acs_data = load_acs_data('acs/census_data_tract.csv')
     impute_acs_data(acs_data, acs=True, save=True, filepath=None, year_dict=None)
-    educ_data = load_acs_data('acs/censu_data_tract.csv')
+    educ_data = load_acs_data('acs/education.csv')
     impute_acs_data(educ_data, acs=False, save=True, filepath=None, year_dict=None)
 
     pass

@@ -122,4 +122,8 @@ plt.show('../figures/y_pred_hist_lr.png')
 mlpipeline.get_feature_importance('LR', x_train, clf_lr, n_importances=10)
 predicted_tracts = test_set.loc[test_set['prediction_lr'] == 1, 'tract'].copy()
 
+eviction_df['correct_with_baseline'] = eviction_df['label'] * eviction_df['label_prev_year']
+(eviction_df.groupby('filing_year')['correct_with_baseline'].sum()/(int(tracts.shape[0]*0.1)))\
+.to_csv('../results/baseline.csv', header=True)
+
 

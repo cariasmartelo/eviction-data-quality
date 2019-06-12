@@ -3,20 +3,21 @@ Predict tracts that will be in the highest 10% in terms of eviction rate in Chic
 
 
 ## Requirements
-numpy 1.15.4
-pandas 0.24.2
-mapclassify 2.0.1
-geopandas 0.4.0+67.g08ad2bf
-sodapy 1.5.2
-census 0.8.13
-us 1.0.0 
-shapely 1.6.4.post2
-scipy 1.2.1
-seaborn 0.9.0
-sklearn 0.20.3
-aequitas 0.38.0
 
-##Repo organization
+- numpy 1.15.4
+- pandas 0.24.2
+- mapclassify 2.0.1
+- geopandas 0.4.0+67.g08ad2bf
+- sodapy 1.5.2
+- census 0.8.13
+- us 1.0.0 
+- shapely 1.6.4.post2
+- scipy 1.2.1
+- seaborn 0.9.0
+- sklearn 0.20.3 
+- aequitas 0.38.0
+
+## Repo organization
 
 - scripts\
 Contains the scripts used to download and process the data, to run the machine learning pipeline, and to produce the descriptive statistics. It also contains Jupyter notebooks where the scripts are used.

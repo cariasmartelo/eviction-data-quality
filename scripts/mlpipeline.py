@@ -265,7 +265,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
 
                         bias_df = test_set.copy()
                         bias_df['predicted_score'] = y_pred_probs
-                        bias_df.sort_values('predicted_score', inplace=True)
+                        bias_df.sort_values(['predicted_score', outcome], inplace=True, ascending=False)
                         bias_df['score'] = generate_binary_at_k(bias_df['predicted_score'], 10)
                         for bias_col in bias_lst:
                             bias_df[bias_col] = bias_set[bias_col]
@@ -273,6 +273,7 @@ def clf_loop_cross_validation(models_to_run, clfs, grid, processed_rv,
                         model_id = [i for i in range(len(bias_df))]
                         # bias_df['entity_id'] = model_id
                         bias_df.rename({outcome:'label_value'}, axis='columns', inplace=True)
+                        print(bias_df.groupby('race').sum())
                         assess_bias(bias_df, 
                                     metrics = ['fnr','for', 'fdr', 'tpr', 'tnr'], 
                                     min_group_size = None)

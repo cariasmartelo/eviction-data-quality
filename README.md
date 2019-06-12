@@ -1,5 +1,5 @@
 # eviction-data-quality
-Effort to improve the legal outreach activities of Non Profit organization __ to reduce eviction in Chicago. We use Machine Learning to build a model that predicts the tracts in Chicago that will be among the top 10% tracts with the highest eviction rate. With this prediction, we hope to improve the efficiency of the work made by ____, because they will be able to destinate their resources to the tracts mots it need. To do this, we use data from the Chicago Evictions Lawyers project, and we complement it with data from the ACS and the CHicago Open Data Portal.
+Effort to improve the legal outreach activities of Non Profit organization __ to reduce eviction in Chicago. We use Machine Learning to build a model that predicts the tracts in Chicago that will be among the top 10% tracts with the highest eviction rate. With this prediction, we hope to improve the efficiency of the work made by ____, because they will be able to destinate their resources to the tracts mots it need. To do this, we use data from the Chicago Evictions Data Portal from the Lawyers’ Committee for Better Housing, and we complement it with data from the ACS and the CHicago Open Data Portal.
 
 
 ## Requirements
@@ -52,7 +52,7 @@ Contains report of the project
 - To run prediction of the Census tracts that in 2019 will be abong the highest 10%, run --run_classification.py--
 
 ## Contributors
-Angelica Valdiviezo
 Camilo Arias
 Chi Nguyen
+Angelica Valdiviezo
 

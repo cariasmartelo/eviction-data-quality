@@ -60,7 +60,9 @@ Contains report of the project
 - To run prediction of the Census tracts that in 2019 will be abong the highest 10%, run --python3 run_classification.py-- in scripts.
 
 ## Contributors
-Camilo Arias
-Chi Nguyen
-Angelica Valdiviezo
+- Camilo Arias
+
+- Chi Nguyen
+
+- Angelica Valdiviezo
 
